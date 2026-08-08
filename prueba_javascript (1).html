@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba de JavaScript</title>
+<style>
+  body {
+    font-family: -apple-system, sans-serif;
+    text-align: center;
+    padding: 60px 20px;
+  }
+  h1 { font-size: 20px; }
+  button {
+    font-size: 18px;
+    padding: 16px 32px;
+    border-radius: 10px;
+    border: 1px solid #ccc;
+    background: #1a1a1a;
+    color: #fff;
+    margin-top: 20px;
+  }
+  #resultado {
+    font-size: 40px;
+    font-weight: 600;
+    margin-top: 20px;
+    color: #2a78d6;
+  }
+  #estado {
+    margin-top: 30px;
+    font-size: 14px;
+    padding: 12px;
+    border-radius: 8px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Prueba de JavaScript</h1>
+<p>Toca el botón. Si el número cambia, esta app SÍ ejecuta JavaScript correctamente.</p>
+
+<div id="resultado">0</div>
+<button type="button" onclick="sumar()">Tocar aquí</button>
+
+<div id="estado" style="display:none;"></div>
+
+<script>
+var contador = 0;
+function sumar() {
+  contador++;
+  document.getElementById('resultado').textContent = contador;
+  var estado = document.getElementById('estado');
+  estado.style.display = 'block';
+  estado.style.background = '#e8f5e9';
+  estado.style.color = '#2a9d4f';
+  estado.textContent = 'JavaScript funciona correctamente en esta app. Es segura para usar con las herramientas MECO-T.';
+}
+</script>
+</body>
+</html>
