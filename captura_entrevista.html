@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECO-T — Captura de Entrevista</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    background: #FFFFFF;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p.subtitle { font-size: 13px; color: #666; margin: 0 0 20px; }
+  .dots { display: flex; gap: 6px; margin-bottom: 20px; }
+  .dot { flex: 1; height: 4px; border-radius: 2px; background: #e5e5e3; }
+  .dot.active { background: #2a78d6; }
+  label.field-label { font-size: 11px; color: #999; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.02em; }
+  input, select, textarea {
+    font-family: inherit;
+    font-size: 14px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 11px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+  }
+  button:active { background: #f0f0f0; }
+  button.active { border-color: #2a78d6; color: #2a78d6; border-width: 2px; }
+  button.primary { background: #1a1a1a; color: #fff; border: none; width: 100%; padding: 13px; font-size: 14px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .card { background: #f7f7f5; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  .section-label { font-size: 13px; color: #444; margin: 20px 0 8px; font-weight: 600; }
+  .muted { font-size: 11px; color: #999; }
+  .badge { font-size: 10px; border-radius: 4px; padding: 1px 6px; margin-left: 6px; }
+  .badge-warn { color: #c98a1f; border: 1px solid #c98a1f; }
+  .rec-banner { display:flex; align-items:center; gap:8px; background:#fdecea; padding:10px 14px; border-radius:10px; margin-bottom:14px; }
+  .rec-dot { width:10px; height:10px; border-radius:50%; background:#c0392b; }
+  .rec-dot.paused { background: #999; }
+  .list-item { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #eee; font-size:13px; }
+  .list-item .grow { flex:1; }
+  .tag-btn { padding:8px 12px; font-size:12px; }
+  .tag-row { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:14px; }
+  #saveStatus { font-size:12px; color:#2a9d4f; margin-top:8px; display:none; }
+  .summary-box { background:#f7f7f5; border-radius:10px; padding:14px; margin-bottom:16px; font-size:13px; color:#444; }
+  .summary-box div { margin-bottom:4px; }
+</style>
+</head>
+<body>
+
+<h1>Captura de Entrevista</h1>
+<p class="subtitle">MECO-T Field Workbook — herramienta independiente, funciona sin conexión</p>
+
+<div class="dots">
+  <div class="dot active" id="dot1"></div>
+  <div class="dot" id="dot2"></div>
+  <div class="dot" id="dot3"></div>
+</div>
+
+<!-- STEP 1 -->
+<div id="step1">
+  <label class="field-label">Foto conjunta (entrevistado + entrevistador)</label>
+  <input type="file" id="fotoInput" accept="image/*" capture="environment" onchange="onFotoCapturada(event)" style="margin-bottom:8px;">
+  <div id="fotoPreviewBox" style="display:none; margin-bottom:12px;">
+    <img id="fotoPreview" style="width:100%; border-radius:8px; display:block;">
+    <p class="muted" id="fotoInfo" style="margin:4px 0 0;"></p>
+  </div>
+
+  <input id="entrevistado" type="text" placeholder="Nombre del entrevistado">
+  <div class="row2">
+    <input id="cargo" type="text" placeholder="Cargo">
+    <input id="puesto" type="text" placeholder="Puesto de trabajo">
+  </div>
+  <div class="row2">
+    <div>
+      <label class="field-label">Antigüedad en el puesto</label>
+      <input id="antPuesto" type="text" placeholder="Ej: 8 meses">
+    </div>
+    <div>
+      <label class="field-label">Antigüedad en la empresa</label>
+      <input id="antEmpresa" type="text" placeholder="Ej: 6 años">
+    </div>
+  </div>
+
+  <label class="field-label">Gestión auditada</label>
+  <select id="gestion" onchange="onGestionChange()"></select>
+  <label class="field-label">Proceso auditado</label>
+  <select id="proceso" onchange="onProcesoChange()"></select>
+  <label class="field-label">Aspecto evaluado</label>
+  <select id="aspecto"></select>
+
+  <label class="field-label">Rol RACI del entrevistado en este Aspecto (puede marcar más de uno)</label>
+  <div class="tag-row" id="raciTags"></div>
+  <p id="raciWarning" class="muted badge-warn" style="display:none; margin:-6px 0 10px;">Marcó los 4 roles — quedará registrado así; el audio conserva el detalle completo.</p>
+
+  <input id="recurre" type="text" placeholder="¿A quién recurre / reporta?">
+  <input id="dependen" type="text" placeholder="¿Quiénes dependen de él/ella?">
+
+  <p class="section-label">¿Autoriza la grabación de audio?</p>
+  <div class="row2" style="margin-bottom:6px;">
+    <button type="button" onclick="setConsent('Acepta')" id="btnAcepta">Acepta</button>
+    <button type="button" onclick="setConsent('No acepta')" id="btnNoAcepta">No acepta</button>
+  </div>
+  <p id="consentStatus" class="muted" style="margin:0 0 16px;">Sin registrar todavía</p>
+
+  <button type="button" class="primary" onclick="goStep(2)">Iniciar entrevista</button>
+</div>
+
+<!-- STEP 2 -->
+<div id="step2" style="display:none;">
+  <button type="button" onclick="goStep(1)" style="margin-bottom:10px; padding:6px 12px; font-size:12px;">‹ Volver a datos del entrevistado</button>
+  <p id="breadcrumb" class="muted" style="margin-bottom:10px;"></p>
+  <div class="rec-banner">
+    <div class="rec-dot" id="recDot"></div>
+    <span style="font-size:13px; color:#c0392b;">Grabando · <span id="timer">00:00</span></span>
+    <button type="button" onclick="pauseRec()" id="pauseBtn" style="margin-left:auto; padding:6px 10px; font-size:12px;">Pausar</button>
+  </div>
+
+  <label class="field-label">Escanear documento (sin pausar la grabación)</label>
+  <input type="file" id="scanInput" accept="image/*" capture="environment" onchange="onScanCapturado(event)" style="margin-bottom:6px;">
+  <div id="scanLog" style="font-size:12px; color:#666; margin-bottom:14px;"></div>
+
+  <p class="section-label">Evaluación Discursiva — Calidad del Discurso Verbal</p>
+  <select id="calidadDiscurso">
+    <option value="">Sin registrar</option>
+    <option>Respuesta Precisa y Sustentada</option>
+    <option>Discurso Evasivo / Rodeos</option>
+    <option>Ausencia de Respuesta por Desconocimiento</option>
+    <option>Evasiva Voluntaria / Omisión</option>
+    <option>Incoherencia / Contradicción Discursiva</option>
+  </select>
+
+  <p class="section-label">Actitud del Auditado — Voluntad de Colaboración</p>
+  <select id="voluntadColaboracion">
+    <option value="">Sin registrar</option>
+    <option>Colaboración Proactiva</option>
+    <option>Colaboración Pasiva / Reactiva</option>
+    <option>Falta de Cooperación / Resistencia</option>
+    <option>Disposición Defensiva</option>
+  </select>
+
+  <p class="section-label">Soporte Conductual — Indicadores No Verbales y Conductuales</p>
+  <select id="indicadoresNoVerbales">
+    <option value="">Sin registrar</option>
+    <option>Conducta Serena y Congruente</option>
+    <option>Incomodidad / Tensión Manifiesta</option>
+    <option>Indicadores de Temor / Ansiedad</option>
+    <option>Incongruencia No Verbal</option>
+  </select>
+
+  <label class="field-label">Justificación / Observaciones (hallazgo físico que sustenta lo seleccionado)</label>
+  <textarea id="justificacionConducta" placeholder="Describe lo observado, en tus palabras"></textarea>
+
+  <label class="field-label">Hipótesis relacionada (opcional)</label>
+  <input id="hipotesisRelacionada" type="text" placeholder="Ej: H-04 — Escasa rotación de Agentes en polvorines">
+  <div class="row2" style="margin-bottom:14px;">
+    <button type="button" onclick="setEfectoHipotesis('fortalece')" id="btnFortalece">Fortalece la hipótesis</button>
+    <button type="button" onclick="setEfectoHipotesis('debilita')" id="btnDebilita">Debilita la hipótesis</button>
+  </div>
+
+  <p class="section-label">Nota rápida (información emergente)</p>
+  <textarea id="notaLibre" placeholder="Ej: evitó contacto visual al mencionar al Supervisor de Acopio"></textarea>
+
+  <button type="button" class="primary" onclick="goStep(3)">Finalizar entrevista</button>
+</div>
+
+<!-- STEP 3 -->
+<div id="step3" style="display:none;">
+  <button type="button" onclick="goStep(2)" style="margin-bottom:10px; padding:6px 12px; font-size:12px;">‹ Volver a la entrevista</button>
+  <p class="section-label" style="margin-top:0;">Evidencias asociadas</p>
+  <label class="field-label">Agregar foto o documento como evidencia</label>
+  <input type="file" id="evidenceInput" accept="image/*" capture="environment" onchange="onEvidenceCapturada(event)" style="margin-bottom:16px;">
+  <div id="evidenceList"></div>
+
+  <p class="section-label">"Si tuviera la autoridad para cambiar tres cosas, ¿cuáles serían?"</p>
+  <textarea id="tresMejoras" placeholder="Respuesta del entrevistado..."></textarea>
+
+  <div class="summary-box" id="resumenBox"></div>
+
+  <button type="button" class="primary" onclick="exportData()">Exportar expediente (JSON)</button>
+  <p id="saveStatus">Descarga iniciada — revisa tus Descargas.</p>
+</div>
+
+<script>
+var arbol = {
+  'Gestión Explosivos': {
+    'Recepción y Almacenamiento': ['Control de inventario', 'Custodia de llaves del polvorín'],
+    'Transporte Interno': ['Autorización de retiro', 'Doble custodia en traslado']
+  },
+  'Gestión Acopio': {
+    'Recepción de Mineral': ['Conciliación de peso', 'Registro de procedencia'],
+    'Control de Calidad': ['Muestreo de laboratorio']
+  },
+  'Gestión Seguridad Patrimonial': {
+    'Control de Accesos': ['Verificación de identidad', 'Registro de visitantes'],
+    'Vigilancia Perimetral': ['Rondas nocturnas']
+  },
+  'Gestión Cía Seguridad Privada A': { 'Habilitación de Agentes': ['Registro MHO', 'Capacitación por puesto'] },
+  'Gestión Cía Seguridad Privada B': { 'Habilitación de Agentes': ['Registro MHO', 'Capacitación por puesto'] }
+};
+
+var consentimiento = null, seconds = 0, timerInterval = null, paused = false;
+var evidenceCount = 0, scanCount = 0, fotoOk = false;
+var efectoHipotesis = null;
+
+function setEfectoHipotesis(v) {
+  efectoHipotesis = (efectoHipotesis === v) ? null : v;
+  document.getElementById('btnFortalece').className = efectoHipotesis === 'fortalece' ? 'active' : '';
+  document.getElementById('btnDebilita').className = efectoHipotesis === 'debilita' ? 'active' : '';
+}
+var roles = ['R','A','C','I'];
+var rolesNombres = {R:'Responsable', A:'Aprobador', C:'Consultado', I:'Informado'};
+var selectedRaci = {};
+
+function fillSelect(id, options) {
+  var el = document.getElementById(id);
+  var html = '';
+  for (var i=0;i<options.length;i++) { html += '<option>'+options[i]+'</option>'; }
+  el.innerHTML = html;
+}
+function onGestionChange() {
+  var g = document.getElementById('gestion').value;
+  var procesos = [];
+  for (var k in arbol[g]) { procesos.push(k); }
+  fillSelect('proceso', procesos);
+  onProcesoChange();
+}
+function onProcesoChange() {
+  var g = document.getElementById('gestion').value;
+  var p = document.getElementById('proceso').value;
+  fillSelect('aspecto', arbol[g][p]);
+}
+(function initGestion(){
+  var gestiones = [];
+  for (var k in arbol) { gestiones.push(k); }
+  fillSelect('gestion', gestiones);
+  onGestionChange();
+})();
+
+function onFotoCapturada(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  fotoOk = true;
+  var url = URL.createObjectURL(file);
+  document.getElementById('fotoPreview').src = url;
+  document.getElementById('fotoPreviewBox').style.display = 'block';
+  var kb = Math.round(file.size/1024);
+  document.getElementById('fotoInfo').textContent = 'Capturada: ' + file.name + ' (' + kb + ' KB)';
+}
+
+function onScanCapturado(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  scanCount++;
+  var el = document.getElementById('scanLog');
+  var row = document.createElement('div');
+  row.className = 'list-item';
+  var num = scanCount < 10 ? '0'+scanCount : ''+scanCount;
+  var url = URL.createObjectURL(file);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'documento_' + num + '_' + file.name;
+  a.textContent = 'Guardar';
+  a.style.marginLeft = 'auto';
+  row.innerHTML = '<span class="grow">Documento-' + num + ' — minuto ' + document.getElementById('timer').textContent + '</span>';
+  row.appendChild(a);
+  el.appendChild(row);
+  event.target.value = '';
+}
+
+function onEvidenceCapturada(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  evidenceCount++;
+  var el = document.getElementById('evidenceList');
+  var row = document.createElement('div');
+  row.className = 'list-item';
+  var num = evidenceCount < 10 ? '0'+evidenceCount : ''+evidenceCount;
+  var now = new Date();
+  var hh = now.getHours() < 10 ? '0'+now.getHours() : ''+now.getHours();
+  var mm = now.getMinutes() < 10 ? '0'+now.getMinutes() : ''+now.getMinutes();
+  var url = URL.createObjectURL(file);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'evidencia_' + num + '_' + file.name;
+  a.textContent = 'Guardar';
+  a.style.marginLeft = '8px';
+  row.innerHTML = '<span class="grow">Evidencia-'+num+' — '+hh+':'+mm+'</span>';
+  row.appendChild(a);
+  el.appendChild(row);
+  event.target.value = '';
+}
+
+function renderRaci() {
+  var el = document.getElementById('raciTags');
+  el.innerHTML = '';
+  for (var i=0;i<roles.length;i++) {
+    (function(r){
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'tag-btn';
+      btn.textContent = r;
+      btn.title = rolesNombres[r];
+      btn.onclick = function(){
+        if (selectedRaci[r]) { delete selectedRaci[r]; btn.className = 'tag-btn'; }
+        else { selectedRaci[r] = true; btn.className = 'tag-btn active'; }
+        var count = 0;
+        for (var k in selectedRaci) count++;
+        document.getElementById('raciWarning').style.display = count===4 ? 'block' : 'none';
+      };
+      el.appendChild(btn);
+    })(roles[i]);
+  }
+}
+renderRaci();
+
+function setConsent(v) {
+  consentimiento = v;
+  document.getElementById('consentStatus').textContent = 'Registrado: ' + v;
+  document.getElementById('btnAcepta').className = v==='Acepta' ? 'active' : '';
+  document.getElementById('btnNoAcepta').className = v==='No acepta' ? 'active' : '';
+}
+
+function rutaActual() {
+  return document.getElementById('gestion').value + ' › ' + document.getElementById('proceso').value + ' › ' + document.getElementById('aspecto').value;
+}
+
+function goStep(n) {
+  document.getElementById('step1').style.display = n===1 ? 'block' : 'none';
+  document.getElementById('step2').style.display = n===2 ? 'block' : 'none';
+  document.getElementById('step3').style.display = n===3 ? 'block' : 'none';
+  document.getElementById('dot1').className = 'dot' + (n>=1 ? ' active' : '');
+  document.getElementById('dot2').className = 'dot' + (n>=2 ? ' active' : '');
+  document.getElementById('dot3').className = 'dot' + (n>=3 ? ' active' : '');
+
+  if (n===2) {
+    document.getElementById('breadcrumb').textContent = rutaActual();
+    if (!timerInterval) {
+      timerInterval = setInterval(function(){
+        if (!paused) {
+          seconds++;
+          var m = String(Math.floor(seconds/60)).padStart ? String(Math.floor(seconds/60)) : ('' + Math.floor(seconds/60));
+          if (m.length < 2) m = '0' + m;
+          var s = seconds % 60;
+          var sStr = s < 10 ? '0'+s : ''+s;
+          document.getElementById('timer').textContent = m + ':' + sStr;
+        }
+      }, 1000);
+    }
+  }
+  if (n===3) {
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    var resumen = document.getElementById('resumenBox');
+    var raciList = [];
+    for (var k in selectedRaci) raciList.push(k);
+    var html = '';
+    html += '<div><strong>' + rutaActual() + '</strong></div>';
+    html += '<div>Entrevistado: ' + (document.getElementById('entrevistado').value || '(sin nombre)') + '</div>';
+    html += '<div>Foto conjunta: ' + (fotoOk ? 'Sí' : 'No') + '</div>';
+    html += '<div>Roles RACI: ' + (raciList.length ? raciList.join(', ') : 'No marcado') + '</div>';
+    html += '<div>Consentimiento: ' + (consentimiento || 'No registrado') + '</div>';
+    html += '<div>Duración: ' + document.getElementById('timer').textContent + '</div>';
+    html += '<div>Documentos escaneados: ' + scanCount + '</div>';
+    html += '<div>Calidad del discurso: ' + (document.getElementById('calidadDiscurso').value || 'No registrado') + '</div>';
+    html += '<div>Voluntad de colaboración: ' + (document.getElementById('voluntadColaboracion').value || 'No registrado') + '</div>';
+    html += '<div>Indicadores no verbales: ' + (document.getElementById('indicadoresNoVerbales').value || 'No registrado') + '</div>';
+    if (efectoHipotesis && document.getElementById('hipotesisRelacionada').value) {
+      html += '<div>Hipótesis "' + document.getElementById('hipotesisRelacionada').value + '": ' + efectoHipotesis + '</div>';
+    }
+    html += '<div>Evidencias adicionales: ' + evidenceCount + '</div>';
+    resumen.innerHTML = html;
+  }
+}
+
+function pauseRec() {
+  paused = !paused;
+  document.getElementById('pauseBtn').textContent = paused ? 'Reanudar' : 'Pausar';
+  document.getElementById('recDot').className = paused ? 'rec-dot paused' : 'rec-dot';
+}
+
+function exportData() {
+  var raciList = [];
+  for (var k in selectedRaci) raciList.push(k);
+
+  var data = {
+    ruta: rutaActual(),
+    entrevistado: document.getElementById('entrevistado').value,
+    cargo: document.getElementById('cargo').value,
+    puesto: document.getElementById('puesto').value,
+    antiguedad_puesto: document.getElementById('antPuesto').value,
+    antiguedad_empresa: document.getElementById('antEmpresa').value,
+    foto_conjunta: fotoOk,
+    roles_raci: raciList,
+    recurre_a: document.getElementById('recurre').value,
+    dependen_de_el: document.getElementById('dependen').value,
+    consentimiento: consentimiento,
+    duracion: document.getElementById('timer').textContent,
+    documentos_escaneados: scanCount,
+    calidad_discurso: document.getElementById('calidadDiscurso').value,
+    voluntad_colaboracion: document.getElementById('voluntadColaboracion').value,
+    indicadores_no_verbales: document.getElementById('indicadoresNoVerbales').value,
+    justificacion_conducta: document.getElementById('justificacionConducta').value,
+    hipotesis_relacionada: document.getElementById('hipotesisRelacionada').value,
+    efecto_sobre_hipotesis: efectoHipotesis,
+    nota_libre: document.getElementById('notaLibre').value,
+    evidencias_adicionales: evidenceCount,
+    tres_mejoras: document.getElementById('tresMejoras').value,
+    fecha_exportacion: new Date().toISOString()
+  };
+  var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'expediente_entrevista_meco-t.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  var status = document.getElementById('saveStatus');
+  status.style.display = 'block';
+  setTimeout(function(){ status.style.display = 'none'; }, 4000);
+}
+</script>
+</body>
+</html>
