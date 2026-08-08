@@ -77,8 +77,9 @@
   <label class="field-label">Foto conjunta (entrevistado + entrevistador)</label>
   <input type="file" id="fotoInput" accept="image/*" capture="environment" onchange="onFotoCapturada(event)" style="margin-bottom:8px;">
   <div id="fotoPreviewBox" style="display:none; margin-bottom:12px;">
-    <img id="fotoPreview" style="width:100%; border-radius:8px; display:block;">
-    <p class="muted" id="fotoInfo" style="margin:4px 0 0;"></p>
+    <img id="fotoPreview" style="width:100%; border-radius:8px; display:block; margin-bottom:6px;">
+    <p class="muted" id="fotoInfo" style="margin:0 0 6px;"></p>
+    <a id="fotoGuardarLink" href="#" download="foto_conjunta.jpg" style="font-size:13px; color:#2a78d6;">Guardar en Archivos</a>
   </div>
 
   <input id="entrevistado" type="text" placeholder="Nombre del entrevistado">
@@ -131,7 +132,7 @@
     <button type="button" onclick="pauseRec()" id="pauseBtn" style="margin-left:auto; padding:6px 10px; font-size:12px;">Pausar</button>
   </div>
 
-  <label class="field-label">Escanear documento (sin pausar la grabación)</label>
+  <label class="field-label">Fotografiar documento (sin pausar la grabación)</label>
   <input type="file" id="scanInput" accept="image/*" capture="environment" onchange="onScanCapturado(event)" style="margin-bottom:6px;">
   <div id="scanLog" style="font-size:12px; color:#666; margin-bottom:14px;"></div>
 
@@ -261,6 +262,9 @@ function onFotoCapturada(event) {
   document.getElementById('fotoPreviewBox').style.display = 'block';
   var kb = Math.round(file.size/1024);
   document.getElementById('fotoInfo').textContent = 'Capturada: ' + file.name + ' (' + kb + ' KB)';
+  var link = document.getElementById('fotoGuardarLink');
+  link.href = url;
+  link.download = 'foto_conjunta_' + file.name;
 }
 
 function onScanCapturado(event) {
@@ -375,7 +379,7 @@ function goStep(n) {
     html += '<div>Roles RACI: ' + (raciList.length ? raciList.join(', ') : 'No marcado') + '</div>';
     html += '<div>Consentimiento: ' + (consentimiento || 'No registrado') + '</div>';
     html += '<div>Duración: ' + document.getElementById('timer').textContent + '</div>';
-    html += '<div>Documentos escaneados: ' + scanCount + '</div>';
+    html += '<div>Documentos fotografiados: ' + scanCount + '</div>';
     html += '<div>Calidad del discurso: ' + (document.getElementById('calidadDiscurso').value || 'No registrado') + '</div>';
     html += '<div>Voluntad de colaboración: ' + (document.getElementById('voluntadColaboracion').value || 'No registrado') + '</div>';
     html += '<div>Indicadores no verbales: ' + (document.getElementById('indicadoresNoVerbales').value || 'No registrado') + '</div>';
@@ -410,7 +414,7 @@ function exportData() {
     dependen_de_el: document.getElementById('dependen').value,
     consentimiento: consentimiento,
     duracion: document.getElementById('timer').textContent,
-    documentos_escaneados: scanCount,
+    documentos_fotografiados: scanCount,
     calidad_discurso: document.getElementById('calidadDiscurso').value,
     voluntad_colaboracion: document.getElementById('voluntadColaboracion').value,
     indicadores_no_verbales: document.getElementById('indicadoresNoVerbales').value,
