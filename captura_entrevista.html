@@ -126,11 +126,12 @@
 <div id="step2" style="display:none;">
   <button type="button" onclick="goStep(1)" style="margin-bottom:10px; padding:6px 12px; font-size:12px;">‹ Volver a datos del entrevistado</button>
   <p id="breadcrumb" class="muted" style="margin-bottom:10px;"></p>
-  <div class="rec-banner">
+  <div class="rec-banner" id="recBanner">
     <div class="rec-dot" id="recDot"></div>
-    <span style="font-size:13px; color:#c0392b;">Grabando · <span id="timer">00:00</span></span>
+    <span style="font-size:13px; color:#c0392b;" id="recLabel">Solicitando micrófono... · <span id="timer">00:00</span></span>
     <button type="button" onclick="pauseRec()" id="pauseBtn" style="margin-left:auto; padding:6px 10px; font-size:12px;">Pausar</button>
   </div>
+  <a id="audioGuardarLink" href="#" download="audio_entrevista.webm" style="display:none; font-size:13px; color:#2a78d6; margin:-8px 0 14px;">Guardar audio en Archivos</a>
 
   <label class="field-label">Fotografiar documento (sin pausar la grabación)</label>
   <input type="file" id="scanInput" accept="image/*" capture="environment" onchange="onScanCapturado(event)" style="margin-bottom:6px;">
@@ -168,7 +169,11 @@
   <textarea id="justificacionConducta" placeholder="Describe lo observado, en tus palabras"></textarea>
 
   <label class="field-label">Hipótesis relacionada (opcional)</label>
-  <input id="hipotesisRelacionada" type="text" placeholder="Ej: H-04 — Escasa rotación de Agentes en polvorines">
+  <select id="hipotesisSelect" onchange="onHipotesisSelectChange()"></select>
+  <div id="nuevaHipotesisBlock" style="display:none;">
+    <input id="nuevaHipotesisTexto" type="text" placeholder="Ej: H-04 — Escasa rotación de Agentes en polvorines">
+    <button type="button" onclick="guardarNuevaHipotesis()" style="width:100%; margin-bottom:10px;">Guardar esta hipótesis en la lista</button>
+  </div>
   <div class="row2" style="margin-bottom:14px;">
     <button type="button" onclick="setEfectoHipotesis('fortalece')" id="btnFortalece">Fortalece la hipótesis</button>
     <button type="button" onclick="setEfectoHipotesis('debilita')" id="btnDebilita">Debilita la hipótesis</button>
@@ -189,12 +194,12 @@
   <div id="evidenceList"></div>
 
   <p class="section-label">"Si tuviera la autoridad para cambiar tres cosas, ¿cuáles serían?"</p>
-  <textarea id="tresMejoras" placeholder="Respuesta del entrevistado..."></textarea>
+  <textarea id="tresMejoras" oninput="renderResumen()" placeholder="Respuesta del entrevistado..."></textarea>
 
   <div class="summary-box" id="resumenBox"></div>
 
-  <button type="button" class="primary" onclick="exportData()">Exportar expediente (JSON)</button>
-  <p id="saveStatus">Descarga iniciada — revisa tus Descargas.</p>
+  <button type="button" class="primary" onclick="prepararExportacion()" id="btnPrepararExport">Preparar expediente (JSON)</button>
+  <a id="exportLink" href="#" download="expediente_entrevista_meco-t.json" style="display:none; text-align:center; width:100%; padding:13px; margin-top:10px; background:#2a9d4f; color:#fff; border-radius:8px; text-decoration:none; font-size:14px;">Guardar expediente en Archivos</a>
 </div>
 
 <script>
@@ -218,6 +223,44 @@ var arbol = {
 var consentimiento = null, seconds = 0, timerInterval = null, paused = false;
 var evidenceCount = 0, scanCount = 0, fotoOk = false;
 var efectoHipotesis = null;
+
+var HIPOTESIS_KEY = 'meco_t_hipotesis_v1';
+function cargarHipotesis() {
+  try {
+    var raw = localStorage.getItem(HIPOTESIS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function guardarListaHipotesis(lista) {
+  try { localStorage.setItem(HIPOTESIS_KEY, JSON.stringify(lista)); } catch (e) {}
+}
+function renderHipotesisSelect(seleccionar) {
+  var lista = cargarHipotesis();
+  var sel = document.getElementById('hipotesisSelect');
+  var html = '<option value="">Sin registrar</option>';
+  for (var i=0;i<lista.length;i++) {
+    html += '<option value="' + lista[i].replace(/"/g,'&quot;') + '">' + lista[i] + '</option>';
+  }
+  html += '<option value="__nueva__">+ Nueva hipótesis</option>';
+  sel.innerHTML = html;
+  if (seleccionar) sel.value = seleccionar;
+}
+function onHipotesisSelectChange() {
+  var sel = document.getElementById('hipotesisSelect');
+  var bloque = document.getElementById('nuevaHipotesisBlock');
+  bloque.style.display = sel.value === '__nueva__' ? 'block' : 'none';
+}
+function guardarNuevaHipotesis() {
+  var texto = document.getElementById('nuevaHipotesisTexto').value.trim();
+  if (!texto) return;
+  var lista = cargarHipotesis();
+  if (lista.indexOf(texto) === -1) lista.push(texto);
+  guardarListaHipotesis(lista);
+  renderHipotesisSelect(texto);
+  document.getElementById('nuevaHipotesisBlock').style.display = 'none';
+  document.getElementById('nuevaHipotesisTexto').value = '';
+}
+renderHipotesisSelect();
 
 function setEfectoHipotesis(v) {
   efectoHipotesis = (efectoHipotesis === v) ? null : v;
@@ -308,6 +351,7 @@ function onEvidenceCapturada(event) {
   row.appendChild(a);
   el.appendChild(row);
   event.target.value = '';
+  renderResumen();
 }
 
 function renderRaci() {
@@ -355,10 +399,11 @@ function goStep(n) {
   if (n===2) {
     document.getElementById('breadcrumb').textContent = rutaActual();
     if (!timerInterval) {
+      iniciarGrabacionReal();
       timerInterval = setInterval(function(){
         if (!paused) {
           seconds++;
-          var m = String(Math.floor(seconds/60)).padStart ? String(Math.floor(seconds/60)) : ('' + Math.floor(seconds/60));
+          var m = String(Math.floor(seconds/60));
           if (m.length < 2) m = '0' + m;
           var s = seconds % 60;
           var sStr = s < 10 ? '0'+s : ''+s;
@@ -369,6 +414,71 @@ function goStep(n) {
   }
   if (n===3) {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    detenerGrabacionReal();
+    renderResumen();
+  }
+}
+
+var mediaRecorder = null;
+var audioChunks = [];
+var micDisponible = false;
+
+function iniciarGrabacionReal() {
+  if (consentimiento !== 'Acepta') {
+    document.getElementById('recBanner').style.background = '#f0f0f0';
+    document.getElementById('recDot').style.background = '#999';
+    document.getElementById('recLabel').innerHTML = 'Sin autorización de audio — solo cronómetro de referencia · <span id="timer">00:00</span>';
+    document.getElementById('pauseBtn').style.display = 'none';
+    return;
+  }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    document.getElementById('recLabel').innerHTML = 'Micrófono no disponible en este navegador · <span id="timer">00:00</span>';
+    document.getElementById('recDot').style.background = '#999';
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+    micDisponible = true;
+    document.getElementById('recLabel').innerHTML = 'Grabando · <span id="timer">' + document.getElementById('timer').textContent + '</span>';
+    var opciones = {};
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) {
+      opciones = { mimeType: 'audio/mp4' };
+    }
+    try {
+      mediaRecorder = new MediaRecorder(stream, opciones);
+    } catch (e) {
+      mediaRecorder = new MediaRecorder(stream);
+    }
+    audioChunks = [];
+    mediaRecorder.ondataavailable = function(e) {
+      if (e.data && e.data.size > 0) audioChunks.push(e.data);
+    };
+    mediaRecorder.start();
+  }).catch(function(err) {
+    document.getElementById('recLabel').innerHTML = 'Sin permiso de micrófono — audio no se grabará · <span id="timer">' + document.getElementById('timer').textContent + '</span>';
+    document.getElementById('recDot').style.background = '#999';
+    micDisponible = false;
+  });
+}
+
+function detenerGrabacionReal() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+    mediaRecorder.stream.getTracks().forEach(function(track){ track.stop(); });
+    mediaRecorder.onstop = function() {
+      if (audioChunks.length === 0) return;
+      var tipo = audioChunks[0].type || 'audio/webm';
+      var blob = new Blob(audioChunks, { type: tipo });
+      var url = URL.createObjectURL(blob);
+      var ext = tipo.indexOf('mp4') !== -1 ? '.m4a' : '.webm';
+      var link = document.getElementById('audioGuardarLink');
+      link.href = url;
+      link.download = 'audio_entrevista' + ext;
+      link.style.display = 'block';
+    };
+  }
+}
+
+function renderResumen() {
     var resumen = document.getElementById('resumenBox');
     var raciList = [];
     for (var k in selectedRaci) raciList.push(k);
@@ -383,21 +493,28 @@ function goStep(n) {
     html += '<div>Calidad del discurso: ' + (document.getElementById('calidadDiscurso').value || 'No registrado') + '</div>';
     html += '<div>Voluntad de colaboración: ' + (document.getElementById('voluntadColaboracion').value || 'No registrado') + '</div>';
     html += '<div>Indicadores no verbales: ' + (document.getElementById('indicadoresNoVerbales').value || 'No registrado') + '</div>';
-    if (efectoHipotesis && document.getElementById('hipotesisRelacionada').value) {
-      html += '<div>Hipótesis "' + document.getElementById('hipotesisRelacionada').value + '": ' + efectoHipotesis + '</div>';
+    if (efectoHipotesis && document.getElementById('hipotesisSelect').value && document.getElementById('hipotesisSelect').value !== '__nueva__') {
+      html += '<div>Hipótesis "' + document.getElementById('hipotesisSelect').value + '": ' + efectoHipotesis + '</div>';
     }
     html += '<div>Evidencias adicionales: ' + evidenceCount + '</div>';
+    var tresM = document.getElementById('tresMejoras').value;
+    html += '<div>Tres mejoras propuestas: ' + (tresM ? tresM : '(sin registrar todavía)') + '</div>';
     resumen.innerHTML = html;
-  }
 }
 
 function pauseRec() {
   paused = !paused;
   document.getElementById('pauseBtn').textContent = paused ? 'Reanudar' : 'Pausar';
   document.getElementById('recDot').className = paused ? 'rec-dot paused' : 'rec-dot';
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    try {
+      if (paused && mediaRecorder.state === 'recording') mediaRecorder.pause();
+      else if (!paused && mediaRecorder.state === 'paused') mediaRecorder.resume();
+    } catch (e) {}
+  }
 }
 
-function exportData() {
+function prepararExportacion() {
   var raciList = [];
   for (var k in selectedRaci) raciList.push(k);
 
@@ -419,7 +536,7 @@ function exportData() {
     voluntad_colaboracion: document.getElementById('voluntadColaboracion').value,
     indicadores_no_verbales: document.getElementById('indicadoresNoVerbales').value,
     justificacion_conducta: document.getElementById('justificacionConducta').value,
-    hipotesis_relacionada: document.getElementById('hipotesisRelacionada').value,
+    hipotesis_relacionada: (document.getElementById('hipotesisSelect').value === '__nueva__' ? '' : document.getElementById('hipotesisSelect').value),
     efecto_sobre_hipotesis: efectoHipotesis,
     nota_libre: document.getElementById('notaLibre').value,
     evidencias_adicionales: evidenceCount,
@@ -428,15 +545,10 @@ function exportData() {
   };
   var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
   var url = URL.createObjectURL(blob);
-  var a = document.createElement('a');
-  a.href = url;
-  a.download = 'expediente_entrevista_meco-t.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  var status = document.getElementById('saveStatus');
-  status.style.display = 'block';
-  setTimeout(function(){ status.style.display = 'none'; }, 4000);
+  var link = document.getElementById('exportLink');
+  link.href = url;
+  link.style.display = 'block';
+  document.getElementById('btnPrepararExport').style.display = 'none';
 }
 </script>
 </body>
