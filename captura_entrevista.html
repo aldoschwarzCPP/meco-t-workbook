@@ -313,7 +313,7 @@ function onFotoCapturada(event) {
   document.getElementById('fotoInfo').textContent = 'Capturada: ' + file.name + ' (' + kb + ' KB)';
   var link = document.getElementById('fotoGuardarLink');
   link.href = url;
-  link.download = 'foto_conjunta_' + file.name;
+  link.download = prefijoArchivo() + '_foto_conjunta_' + file.name;
 }
 
 function onScanCapturado(event) {
@@ -327,7 +327,7 @@ function onScanCapturado(event) {
   var url = URL.createObjectURL(file);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'documento_' + num + '_' + file.name;
+  a.download = prefijoArchivo() + '_documento_' + num + '_' + file.name;
   a.textContent = 'Guardar';
   a.style.marginLeft = 'auto';
   row.innerHTML = '<span class="grow">Documento-' + num + ' — minuto ' + document.getElementById('timer').textContent + '</span>';
@@ -350,7 +350,7 @@ function onEvidenceCapturada(event) {
   var url = URL.createObjectURL(file);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'evidencia_' + num + '_' + file.name;
+  a.download = prefijoArchivo() + '_evidencia_' + num + '_' + file.name;
   a.textContent = 'Guardar';
   a.style.marginLeft = '8px';
   row.innerHTML = '<span class="grow">Evidencia-'+num+' — '+hh+':'+mm+'</span>';
@@ -392,6 +392,14 @@ function setConsent(v) {
 
 function rutaActual() {
   return document.getElementById('gestion').value + ' › ' + document.getElementById('proceso').value + ' › ' + document.getElementById('aspecto').value;
+}
+
+function prefijoArchivo() {
+  var nombreLimpio = (document.getElementById('entrevistado').value || 'SinNombre')
+    .trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_ÁÉÍÓÚáéíóúÑñ]/g, '');
+  var gestionLimpia = (document.getElementById('gestion').value || 'SinGestion')
+    .replace(/^Gestión\s+/i, '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_ÁÉÍÓÚáéíóúÑñ]/g, '');
+  return nombreLimpio + '_' + gestionLimpia;
 }
 
 function goStep(n) {
@@ -479,7 +487,7 @@ function detenerGrabacionReal() {
       var ext = tipo.indexOf('mp4') !== -1 ? '.m4a' : '.webm';
       var link = document.getElementById('audioGuardarLink');
       link.href = url;
-      link.download = 'audio_entrevista' + ext;
+      link.download = prefijoArchivo() + '_audio_entrevista' + ext;
       link.style.display = 'block';
     };
   }
@@ -492,14 +500,22 @@ function renderResumen() {
     var html = '';
     html += '<div><strong>' + rutaActual() + '</strong></div>';
     html += '<div>Entrevistado: ' + (document.getElementById('entrevistado').value || '(sin nombre)') + '</div>';
+    html += '<div>Cargo / Puesto: ' + (document.getElementById('cargo').value || '(sin registrar)') + ' / ' + (document.getElementById('puesto').value || '(sin registrar)') + '</div>';
+    html += '<div>Antigüedad — puesto: ' + (document.getElementById('antPuesto').value || '(sin registrar)') + ' · empresa: ' + (document.getElementById('antEmpresa').value || '(sin registrar)') + '</div>';
     html += '<div>Foto conjunta: ' + (fotoOk ? 'Sí' : 'No') + '</div>';
     html += '<div>Roles RACI: ' + (raciList.length ? raciList.join(', ') : 'No marcado') + '</div>';
+    html += '<div>Recurre a: ' + (document.getElementById('recurre').value || '(sin registrar)') + '</div>';
+    html += '<div>Dependen de él/ella: ' + (document.getElementById('dependen').value || '(sin registrar)') + '</div>';
     html += '<div>Consentimiento: ' + (consentimiento || 'No registrado') + '</div>';
     html += '<div>Duración: ' + document.getElementById('timer').textContent + '</div>';
     html += '<div>Documentos fotografiados: ' + scanCount + '</div>';
     html += '<div>Calidad del discurso: ' + (document.getElementById('calidadDiscurso').value || 'No registrado') + '</div>';
     html += '<div>Voluntad de colaboración: ' + (document.getElementById('voluntadColaboracion').value || 'No registrado') + '</div>';
     html += '<div>Indicadores no verbales: ' + (document.getElementById('indicadoresNoVerbales').value || 'No registrado') + '</div>';
+    var justif = document.getElementById('justificacionConducta').value;
+    html += '<div>Justificación / Observaciones: ' + (justif ? justif : '(sin registrar todavía)') + '</div>';
+    var notaLib = document.getElementById('notaLibre').value;
+    html += '<div>Nota rápida (información emergente): ' + (notaLib ? notaLib : '(sin registrar todavía)') + '</div>';
     if (efectoHipotesis && document.getElementById('hipotesisSelect').value && document.getElementById('hipotesisSelect').value !== '__nueva__') {
       html += '<div>Hipótesis "' + document.getElementById('hipotesisSelect').value + '": ' + efectoHipotesis + '</div>';
     }
@@ -554,6 +570,7 @@ function prepararExportacion() {
   var url = URL.createObjectURL(blob);
   var link = document.getElementById('exportLink');
   link.href = url;
+  link.download = prefijoArchivo() + '_expediente_entrevista_meco-t.json';
   link.style.display = 'block';
   document.getElementById('btnPrepararExport').style.display = 'none';
 }
