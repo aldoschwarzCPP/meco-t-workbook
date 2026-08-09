@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECO-T — Resumen del Día</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    background: #FFFFFF;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p.subtitle { font-size: 13px; color: #666; margin: 0 0 20px; }
+  label.field-label { font-size: 11px; color: #999; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.02em; }
+  input, textarea {
+    font-family: inherit;
+    font-size: 14px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 60px; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+  }
+  button:active { background: #f0f0f0; }
+  button.primary { background: #1a1a1a; color: #fff; border: none; width: 100%; padding: 13px; font-size: 14px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .row4 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .card { background: #f7f7f5; border-radius: 10px; padding: 12px 14px; }
+  .card p.num { font-size: 22px; font-weight: 600; margin: 0; }
+  .card p.lbl { font-size: 12px; color: #666; margin: 0 0 2px; }
+  .section-label { font-size: 13px; color: #444; margin: 20px 0 8px; font-weight: 600; }
+  .muted { font-size: 11px; color: #999; }
+  .hip-row { background: #f7f7f5; border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; }
+  .hip-row .text { font-size: 13px; margin-bottom: 8px; }
+  .hip-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .hip-btns button { font-size: 12px; padding: 8px; }
+  .hip-btns button.active-up { border-color: #2a9d4f; color: #2a9d4f; border-width: 2px; }
+  .hip-btns button.active-down { border-color: #c0392b; color: #c0392b; border-width: 2px; }
+  .list-item { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #eee; font-size:13px; }
+  .list-item .grow { flex:1; }
+  .list-item button { padding: 4px 10px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<h1>Resumen del Día</h1>
+<p class="subtitle" id="fechaHoy">MECO-T Field Workbook — herramienta independiente, funciona sin conexión</p>
+
+<p class="section-label" style="margin-top:0;">Cifras del día</p>
+<div class="row4">
+  <div class="card"><p class="lbl">Entrevistas realizadas</p><input id="numEntrevistas" type="number" min="0" style="margin:0; border:none; padding:0; font-size:22px; font-weight:600;" placeholder="0"></div>
+  <div class="card"><p class="lbl">Evidencias capturadas</p><input id="numEvidencias" type="number" min="0" style="margin:0; border:none; padding:0; font-size:22px; font-weight:600;" placeholder="0"></div>
+  <div class="card"><p class="lbl">Documentos fotografiados</p><input id="numDocumentos" type="number" min="0" style="margin:0; border:none; padding:0; font-size:22px; font-weight:600;" placeholder="0"></div>
+  <div class="card"><p class="lbl">Horas de campo</p><input id="numHoras" type="number" min="0" step="0.5" style="margin:0; border:none; padding:0; font-size:22px; font-weight:600;" placeholder="0"></div>
+</div>
+
+<p class="section-label">Hipótesis tocadas hoy</p>
+<p class="muted" style="margin:0 0 10px;">Esta lista se comparte con la Captura de Entrevista — las hipótesis nuevas que registres ahí aparecen aquí también.</p>
+<div id="hipotesisList"></div>
+<p class="muted" id="sinHipotesis" style="display:none;">Todavía no hay hipótesis registradas. Se agregan desde la Captura de Entrevista.</p>
+
+<p class="section-label">Reflexión profesional</p>
+<textarea id="reflexion" placeholder="¿Qué aprendí hoy? ¿Qué debo observar mañana?"></textarea>
+
+<p class="section-label">Agenda de mañana</p>
+<div id="agendaList"></div>
+<div class="row2" style="margin-top:8px;">
+  <input id="nuevaTarea" type="text" placeholder="Entrevista, visita o pendiente" style="margin:0;">
+  <button type="button" onclick="addTarea()">Agregar</button>
+</div>
+
+<button type="button" class="primary" onclick="prepararExportacion()" id="btnPreparar" style="margin-top:16px;">Preparar resumen (JSON)</button>
+<a id="exportLink" href="#" download="resumen_dia_meco-t.json" style="display:none; text-align:center; width:100%; padding:13px; margin-top:10px; background:#2a9d4f; color:#fff; border-radius:8px; text-decoration:none; font-size:14px;">Guardar resumen en Archivos</a>
+
+<script>
+var HIPOTESIS_KEY = 'meco_t_hipotesis_v1';
+var AGENDA_KEY = 'meco_t_agenda_v1';
+var efectosHipotesis = {};
+
+var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+var hoy = new Date();
+document.getElementById('fechaHoy').textContent = hoy.getDate() + ' de ' + meses[hoy.getMonth()] + ' de ' + hoy.getFullYear();
+
+function cargarHipotesis() {
+  try {
+    var raw = localStorage.getItem(HIPOTESIS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+function renderHipotesis() {
+  var lista = cargarHipotesis();
+  var el = document.getElementById('hipotesisList');
+  var vacio = document.getElementById('sinHipotesis');
+  el.innerHTML = '';
+  if (lista.length === 0) {
+    vacio.style.display = 'block';
+    return;
+  }
+  vacio.style.display = 'none';
+  for (var i=0;i<lista.length;i++) {
+    (function(texto){
+      var row = document.createElement('div');
+      row.className = 'hip-row';
+      var textDiv = document.createElement('div');
+      textDiv.className = 'text';
+      textDiv.textContent = texto;
+      row.appendChild(textDiv);
+      var btns = document.createElement('div');
+      btns.className = 'hip-btns';
+      var btnUp = document.createElement('button');
+      btnUp.type = 'button';
+      btnUp.textContent = 'Se fortaleció';
+      var btnDown = document.createElement('button');
+      btnDown.type = 'button';
+      btnDown.textContent = 'Se debilitó';
+      btnUp.onclick = function(){
+        efectosHipotesis[texto] = (efectosHipotesis[texto] === 'fortalece') ? null : 'fortalece';
+        btnUp.className = efectosHipotesis[texto] === 'fortalece' ? 'active-up' : '';
+        btnDown.className = '';
+      };
+      btnDown.onclick = function(){
+        efectosHipotesis[texto] = (efectosHipotesis[texto] === 'debilita') ? null : 'debilita';
+        btnDown.className = efectosHipotesis[texto] === 'debilita' ? 'active-down' : '';
+        btnUp.className = '';
+      };
+      btns.appendChild(btnUp);
+      btns.appendChild(btnDown);
+      row.appendChild(btns);
+      el.appendChild(row);
+    })(lista[i]);
+  }
+}
+renderHipotesis();
+
+function cargarAgenda() {
+  try {
+    var raw = localStorage.getItem(AGENDA_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function guardarAgenda(lista) {
+  try { localStorage.setItem(AGENDA_KEY, JSON.stringify(lista)); } catch (e) {}
+}
+function renderAgenda() {
+  var lista = cargarAgenda();
+  var el = document.getElementById('agendaList');
+  el.innerHTML = '';
+  for (var i=0;i<lista.length;i++) {
+    (function(idx){
+      var row = document.createElement('div');
+      row.className = 'list-item';
+      var span = document.createElement('span');
+      span.className = 'grow';
+      span.textContent = lista[idx];
+      row.appendChild(span);
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.textContent = 'Quitar';
+      del.onclick = function(){
+        var l = cargarAgenda();
+        l.splice(idx,1);
+        guardarAgenda(l);
+        renderAgenda();
+      };
+      row.appendChild(del);
+      el.appendChild(row);
+    })(i);
+  }
+}
+renderAgenda();
+
+function addTarea() {
+  var input = document.getElementById('nuevaTarea');
+  var texto = input.value.trim();
+  if (!texto) return;
+  var lista = cargarAgenda();
+  lista.push(texto);
+  guardarAgenda(lista);
+  input.value = '';
+  renderAgenda();
+}
+
+function prepararExportacion() {
+  var hipData = [];
+  var lista = cargarHipotesis();
+  for (var i=0;i<lista.length;i++) {
+    hipData.push({ hipotesis: lista[i], efecto: efectosHipotesis[lista[i]] || 'sin cambio' });
+  }
+  var data = {
+    fecha: document.getElementById('fechaHoy').textContent,
+    entrevistas_realizadas: document.getElementById('numEntrevistas').value || 0,
+    evidencias_capturadas: document.getElementById('numEvidencias').value || 0,
+    documentos_fotografiados: document.getElementById('numDocumentos').value || 0,
+    horas_de_campo: document.getElementById('numHoras').value || 0,
+    hipotesis_del_dia: hipData,
+    reflexion_profesional: document.getElementById('reflexion').value,
+    agenda_manana: cargarAgenda(),
+    fecha_exportacion: new Date().toISOString()
+  };
+  var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  var url = URL.createObjectURL(blob);
+  var link = document.getElementById('exportLink');
+  link.href = url;
+  link.style.display = 'block';
+  document.getElementById('btnPreparar').style.display = 'none';
+}
+</script>
+</body>
+</html>
