@@ -398,8 +398,8 @@ function goStep(n) {
 
   if (n===2) {
     document.getElementById('breadcrumb').textContent = rutaActual();
+    iniciarGrabacionReal();
     if (!timerInterval) {
-      iniciarGrabacionReal();
       timerInterval = setInterval(function(){
         if (!paused) {
           seconds++;
@@ -424,15 +424,16 @@ var audioChunks = [];
 var micDisponible = false;
 
 function iniciarGrabacionReal() {
+  if (mediaRecorder && mediaRecorder.state === 'recording') return;
   if (consentimiento !== 'Acepta') {
     document.getElementById('recBanner').style.background = '#f0f0f0';
     document.getElementById('recDot').style.background = '#999';
-    document.getElementById('recLabel').innerHTML = 'Sin autorización de audio — solo cronómetro de referencia · <span id="timer">00:00</span>';
+    document.getElementById('recLabel').innerHTML = 'Sin autorización de audio — solo cronómetro de referencia · <span id="timer">' + document.getElementById('timer').textContent + '</span>';
     document.getElementById('pauseBtn').style.display = 'none';
     return;
   }
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    document.getElementById('recLabel').innerHTML = 'Micrófono no disponible en este navegador · <span id="timer">00:00</span>';
+    document.getElementById('recLabel').innerHTML = 'Micrófono no disponible en este navegador · <span id="timer">' + document.getElementById('timer').textContent + '</span>';
     document.getElementById('recDot').style.background = '#999';
     return;
   }
