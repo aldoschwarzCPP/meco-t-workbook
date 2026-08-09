@@ -71,6 +71,7 @@
 </div>
 
 <p class="section-label">Hipótesis tocadas hoy</p>
+<button type="button" onclick="renderHipotesis()" style="margin-bottom:8px;">Actualizar lista</button>
 <p class="muted" style="margin:0 0 10px;">Esta lista se comparte con la Captura de Entrevista — las hipótesis nuevas que registres ahí aparecen aquí también.</p>
 <div id="hipotesisList"></div>
 <p class="muted" id="sinHipotesis" style="display:none;">Todavía no hay hipótesis registradas. Se agregan desde la Captura de Entrevista.</p>
@@ -148,6 +149,9 @@ function renderHipotesis() {
   }
 }
 renderHipotesis();
+window.addEventListener('storage', function(e){ if (e.key === HIPOTESIS_KEY) renderHipotesis(); });
+window.addEventListener('focus', renderHipotesis);
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) renderHipotesis(); });
 
 function cargarAgenda() {
   try {

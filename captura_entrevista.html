@@ -169,7 +169,10 @@
   <textarea id="justificacionConducta" placeholder="Describe lo observado, en tus palabras"></textarea>
 
   <label class="field-label">Hipótesis relacionada (opcional)</label>
-  <select id="hipotesisSelect" onchange="onHipotesisSelectChange()"></select>
+  <div style="display:flex; gap:8px; margin-bottom:10px;">
+    <select id="hipotesisSelect" onchange="onHipotesisSelectChange()" style="margin:0; flex:1;"></select>
+    <button type="button" onclick="renderHipotesisSelect()" style="padding:0 14px;">Actualizar lista</button>
+  </div>
   <div id="nuevaHipotesisBlock" style="display:none;">
     <input id="nuevaHipotesisTexto" type="text" placeholder="Ej: H-04 — Escasa rotación de Agentes en polvorines">
     <button type="button" onclick="guardarNuevaHipotesis()" style="width:100%; margin-bottom:10px;">Guardar esta hipótesis en la lista</button>
@@ -261,6 +264,9 @@ function guardarNuevaHipotesis() {
   document.getElementById('nuevaHipotesisTexto').value = '';
 }
 renderHipotesisSelect();
+window.addEventListener('storage', function(e){ if (e.key === HIPOTESIS_KEY) renderHipotesisSelect(document.getElementById('hipotesisSelect').value); });
+window.addEventListener('focus', function(){ renderHipotesisSelect(document.getElementById('hipotesisSelect').value); });
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) renderHipotesisSelect(document.getElementById('hipotesisSelect').value); });
 
 function setEfectoHipotesis(v) {
   efectoHipotesis = (efectoHipotesis === v) ? null : v;
