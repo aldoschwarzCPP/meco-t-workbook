@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECO-T — Configuración de Hipótesis</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    background: #FFFFFF;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p.subtitle { font-size: 13px; color: #666; margin: 0 0 20px; }
+  label.field-label { font-size: 11px; color: #999; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.02em; }
+  input, textarea {
+    font-family: inherit;
+    font-size: 14px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 90px; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+  }
+  button:active { background: #f0f0f0; }
+  button.primary { background: #1a1a1a; color: #fff; border: none; width: 100%; padding: 13px; font-size: 14px; }
+  .section-label { font-size: 13px; color: #444; margin: 20px 0 8px; font-weight: 600; }
+  .muted { font-size: 11px; color: #999; }
+  .card { background: #f7f7f5; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  .hip-row { display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid #eee; font-size:13px; }
+  .hip-row .text { flex:1; }
+  .hip-row button { padding: 5px 10px; font-size: 12px; }
+  .count-badge { display:inline-block; background:#1a1a1a; color:#fff; border-radius:12px; padding:2px 10px; font-size:12px; margin-left:6px; }
+</style>
+</head>
+<body>
+
+<h1>Configuración de Hipótesis</h1>
+<p class="subtitle">MECO-T Field Workbook — herramienta independiente, funciona sin conexión</p>
+
+<div class="card">
+  <p class="section-label" style="margin-top:0;">Carga inicial — desde la Fase II</p>
+  <p class="muted" style="margin:0 0 8px;">Pega aquí las hipótesis ya formuladas antes de salir a campo, una por línea. Ejemplo: "H-04 — Escasa rotación de Agentes en polvorines"</p>
+  <textarea id="cargaMasiva" placeholder="H-01 — Primera hipótesis...&#10;H-02 — Segunda hipótesis...&#10;H-03 — Tercera hipótesis..."></textarea>
+  <button type="button" class="primary" onclick="cargarLote()">Cargar todas a la lista</button>
+</div>
+
+<p class="section-label" style="margin-top:0;">Hipótesis vigentes<span class="count-badge" id="contador">0</span></p>
+<p class="muted" style="margin:0 0 10px;">Esta lista es la misma que usan la Captura de Entrevista y el Resumen del Día — cualquier cambio aquí se refleja allá también.</p>
+<div id="hipotesisList"></div>
+<p class="muted" id="sinHipotesis" style="display:none;">Todavía no hay hipótesis cargadas.</p>
+
+<p class="section-label">Agregar una hipótesis suelta</p>
+<input id="nuevaIndividual" type="text" placeholder="Ej: H-07 — Videovigilancia sin capacidad nocturna">
+<button type="button" onclick="agregarIndividual()" style="width:100%;">Agregar a la lista</button>
+
+<script>
+var HIPOTESIS_KEY = 'meco_t_hipotesis_v1';
+
+function cargarHipotesis() {
+  try {
+    var raw = localStorage.getItem(HIPOTESIS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function guardarLista(lista) {
+  try { localStorage.setItem(HIPOTESIS_KEY, JSON.stringify(lista)); } catch (e) {}
+}
+
+function renderLista() {
+  var lista = cargarHipotesis();
+  var el = document.getElementById('hipotesisList');
+  var vacio = document.getElementById('sinHipotesis');
+  document.getElementById('contador').textContent = lista.length;
+  el.innerHTML = '';
+  if (lista.length === 0) {
+    vacio.style.display = 'block';
+    return;
+  }
+  vacio.style.display = 'none';
+  for (var i=0;i<lista.length;i++) {
+    (function(idx){
+      var row = document.createElement('div');
+      row.className = 'hip-row';
+      var span = document.createElement('span');
+      span.className = 'text';
+      span.textContent = lista[idx];
+      row.appendChild(span);
+      var editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.textContent = 'Editar';
+      editBtn.onclick = function(){
+        var actual = cargarHipotesis();
+        var nuevo = prompt('Editar hipótesis:', actual[idx]);
+        if (nuevo !== null && nuevo.trim()) {
+          actual[idx] = nuevo.trim();
+          guardarLista(actual);
+          renderLista();
+        }
+      };
+      var delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.textContent = 'Quitar';
+      delBtn.onclick = function(){
+        var actual = cargarHipotesis();
+        actual.splice(idx,1);
+        guardarLista(actual);
+        renderLista();
+      };
+      row.appendChild(editBtn);
+      row.appendChild(delBtn);
+      el.appendChild(row);
+    })(i);
+  }
+}
+renderLista();
+
+function cargarLote() {
+  var texto = document.getElementById('cargaMasiva').value;
+  var lineas = texto.split('\n');
+  var lista = cargarHipotesis();
+  var agregadas = 0;
+  for (var i=0;i<lineas.length;i++) {
+    var linea = lineas[i].trim();
+    if (linea && lista.indexOf(linea) === -1) {
+      lista.push(linea);
+      agregadas++;
+    }
+  }
+  guardarLista(lista);
+  document.getElementById('cargaMasiva').value = '';
+  renderLista();
+  alert(agregadas + ' hipótesis agregadas a la lista.');
+}
+
+function agregarIndividual() {
+  var input = document.getElementById('nuevaIndividual');
+  var texto = input.value.trim();
+  if (!texto) return;
+  var lista = cargarHipotesis();
+  if (lista.indexOf(texto) === -1) lista.push(texto);
+  guardarLista(lista);
+  input.value = '';
+  renderLista();
+}
+</script>
+</body>
+</html>
