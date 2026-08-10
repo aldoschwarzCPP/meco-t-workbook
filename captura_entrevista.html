@@ -126,11 +126,12 @@
 <div id="step2" style="display:none;">
   <button type="button" onclick="goStep(1)" style="margin-bottom:10px; padding:6px 12px; font-size:12px;">‹ Volver a datos del entrevistado</button>
   <p id="breadcrumb" class="muted" style="margin-bottom:10px;"></p>
-  <div class="rec-banner" id="recBanner">
-    <div class="rec-dot" id="recDot"></div>
-    <span style="font-size:13px; color:#c0392b;" id="recLabel">Solicitando micrófono... · <span id="timer">00:00</span></span>
+  <div class="rec-banner" id="recBanner" style="background:#fdf0e0;">
+    <div class="rec-dot" id="recDot" style="background:#d68a1f;"></div>
+    <span style="font-size:13px; color:#a5670f;" id="recLabel">Cronómetro de referencia · <span id="timer">00:00</span></span>
     <button type="button" onclick="pauseRec()" id="pauseBtn" style="margin-left:auto; padding:6px 10px; font-size:12px;">Pausar</button>
   </div>
+  <p id="recordatorioNotasVoz" class="muted" style="margin:-8px 0 14px; display:none;">Recuerda: abre Notas de Voz y presiona grabar por separado — este cronómetro solo te ayuda a llevar el tiempo, no graba audio.</p>
 
   <label class="field-label">Fotografiar documento (sin pausar la grabación)</label>
   <input type="file" id="scanInput" accept="image/*" capture="environment" onchange="onScanCapturado(event)" style="margin-bottom:6px;">
@@ -190,10 +191,6 @@
 <!-- STEP 3 -->
 <div id="step3" style="display:none;">
   <button type="button" onclick="goStep(2)" style="margin-bottom:10px; padding:6px 12px; font-size:12px;">‹ Volver a la entrevista</button>
-  <div id="audioBox" style="display:none; margin-bottom:16px;">
-    <p class="muted" style="margin:0 0 6px;">Audio de la entrevista</p>
-    <a id="audioGuardarLink" href="#" download="audio_entrevista.webm" style="display:block; text-align:center; padding:11px; background:#2a9d4f; color:#fff; border-radius:8px; text-decoration:none; font-size:14px;">Guardar audio en Archivos</a>
-  </div>
   <p class="section-label" style="margin-top:0;">Evidencias asociadas</p>
   <label class="field-label">Agregar foto o documento como evidencia</label>
   <input type="file" id="evidenceInput" accept="image/*" capture="environment" onchange="onEvidenceCapturada(event)" style="margin-bottom:16px;">
@@ -415,7 +412,7 @@ function goStep(n) {
 
   if (n===2) {
     document.getElementById('breadcrumb').textContent = rutaActual();
-    iniciarGrabacionReal();
+    mostrarRecordatorioAudio();
     if (!timerInterval) {
       timerInterval = setInterval(function(){
         if (!paused) {
@@ -431,68 +428,18 @@ function goStep(n) {
   }
   if (n===3) {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-    detenerGrabacionReal();
     renderResumen();
   }
 }
 
-var mediaRecorder = null;
-var audioChunks = [];
-var micDisponible = false;
-
-function iniciarGrabacionReal() {
-  if (mediaRecorder && mediaRecorder.state === 'recording') return;
-  if (consentimiento !== 'Acepta') {
+function mostrarRecordatorioAudio() {
+  if (consentimiento === 'Acepta') {
+    document.getElementById('recordatorioNotasVoz').style.display = 'block';
+  } else {
+    document.getElementById('recordatorioNotasVoz').style.display = 'none';
+    document.getElementById('recLabel').innerHTML = 'Sin autorización de audio — solo cronómetro de referencia · <span id="timer">' + document.getElementById('timer').textContent + '</span>';
     document.getElementById('recBanner').style.background = '#f0f0f0';
     document.getElementById('recDot').style.background = '#999';
-    document.getElementById('recLabel').innerHTML = 'Sin autorización de audio — solo cronómetro de referencia · <span id="timer">' + document.getElementById('timer').textContent + '</span>';
-    document.getElementById('pauseBtn').style.display = 'none';
-    return;
-  }
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    document.getElementById('recLabel').innerHTML = 'Micrófono no disponible en este navegador · <span id="timer">' + document.getElementById('timer').textContent + '</span>';
-    document.getElementById('recDot').style.background = '#999';
-    return;
-  }
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
-    micDisponible = true;
-    document.getElementById('recLabel').innerHTML = 'Grabando · <span id="timer">' + document.getElementById('timer').textContent + '</span>';
-    var opciones = {};
-    if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported('audio/mp4')) {
-      opciones = { mimeType: 'audio/mp4' };
-    }
-    try {
-      mediaRecorder = new MediaRecorder(stream, opciones);
-    } catch (e) {
-      mediaRecorder = new MediaRecorder(stream);
-    }
-    audioChunks = [];
-    mediaRecorder.ondataavailable = function(e) {
-      if (e.data && e.data.size > 0) audioChunks.push(e.data);
-    };
-    mediaRecorder.start();
-  }).catch(function(err) {
-    document.getElementById('recLabel').innerHTML = 'Sin permiso de micrófono — audio no se grabará · <span id="timer">' + document.getElementById('timer').textContent + '</span>';
-    document.getElementById('recDot').style.background = '#999';
-    micDisponible = false;
-  });
-}
-
-function detenerGrabacionReal() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop();
-    mediaRecorder.stream.getTracks().forEach(function(track){ track.stop(); });
-    mediaRecorder.onstop = function() {
-      if (audioChunks.length === 0) return;
-      var tipo = audioChunks[0].type || 'audio/webm';
-      var blob = new Blob(audioChunks, { type: tipo });
-      var url = URL.createObjectURL(blob);
-      var ext = tipo.indexOf('mp4') !== -1 ? '.m4a' : '.webm';
-      var link = document.getElementById('audioGuardarLink');
-      link.href = url;
-      link.download = prefijoArchivo() + '_audio_entrevista' + ext;
-      document.getElementById('audioBox').style.display = 'block';
-    };
   }
 }
 
@@ -532,12 +479,6 @@ function pauseRec() {
   paused = !paused;
   document.getElementById('pauseBtn').textContent = paused ? 'Reanudar' : 'Pausar';
   document.getElementById('recDot').className = paused ? 'rec-dot paused' : 'rec-dot';
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    try {
-      if (paused && mediaRecorder.state === 'recording') mediaRecorder.pause();
-      else if (!paused && mediaRecorder.state === 'paused') mediaRecorder.resume();
-    } catch (e) {}
-  }
 }
 
 function prepararExportacion() {
