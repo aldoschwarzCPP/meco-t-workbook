@@ -131,7 +131,6 @@
     <span style="font-size:13px; color:#c0392b;" id="recLabel">Solicitando micrófono... · <span id="timer">00:00</span></span>
     <button type="button" onclick="pauseRec()" id="pauseBtn" style="margin-left:auto; padding:6px 10px; font-size:12px;">Pausar</button>
   </div>
-  <a id="audioGuardarLink" href="#" download="audio_entrevista.webm" style="display:none; font-size:13px; color:#2a78d6; margin:-8px 0 14px;">Guardar audio en Archivos</a>
 
   <label class="field-label">Fotografiar documento (sin pausar la grabación)</label>
   <input type="file" id="scanInput" accept="image/*" capture="environment" onchange="onScanCapturado(event)" style="margin-bottom:6px;">
@@ -191,6 +190,10 @@
 <!-- STEP 3 -->
 <div id="step3" style="display:none;">
   <button type="button" onclick="goStep(2)" style="margin-bottom:10px; padding:6px 12px; font-size:12px;">‹ Volver a la entrevista</button>
+  <div id="audioBox" style="display:none; margin-bottom:16px;">
+    <p class="muted" style="margin:0 0 6px;">Audio de la entrevista</p>
+    <a id="audioGuardarLink" href="#" download="audio_entrevista.webm" style="display:block; text-align:center; padding:11px; background:#2a9d4f; color:#fff; border-radius:8px; text-decoration:none; font-size:14px;">Guardar audio en Archivos</a>
+  </div>
   <p class="section-label" style="margin-top:0;">Evidencias asociadas</p>
   <label class="field-label">Agregar foto o documento como evidencia</label>
   <input type="file" id="evidenceInput" accept="image/*" capture="environment" onchange="onEvidenceCapturada(event)" style="margin-bottom:16px;">
@@ -488,7 +491,7 @@ function detenerGrabacionReal() {
       var link = document.getElementById('audioGuardarLink');
       link.href = url;
       link.download = prefijoArchivo() + '_audio_entrevista' + ext;
-      link.style.display = 'block';
+      document.getElementById('audioBox').style.display = 'block';
     };
   }
 }
