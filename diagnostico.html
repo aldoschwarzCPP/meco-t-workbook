@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECO-T — Diagnóstico</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    background: #FFFFFF;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p.subtitle { font-size: 13px; color: #666; margin: 0 0 20px; }
+  .card { background: #f7f7f5; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  .card p.lbl { font-size: 12px; color: #666; margin: 0 0 4px; }
+  .card p.val { font-size: 15px; font-weight: 600; margin: 0; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    width: 100%;
+    margin-bottom: 10px;
+  }
+  .section-label { font-size: 13px; color: #444; margin: 20px 0 8px; font-weight: 600; }
+  .muted { font-size: 11px; color: #999; }
+  pre {
+    background: #1a1a1a;
+    color: #7ee787;
+    font-size: 11px;
+    padding: 12px;
+    border-radius: 8px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .hip-row { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+  .warn { background: #fdecea; color: #c0392b; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+  .ok { background: #eaf7ed; color: #2a9d4f; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+
+<h1>Diagnóstico del Workbook</h1>
+<p class="subtitle">Muestra exactamente qué hay guardado ahora mismo, sin interpretaciones — para verificar la sincronización real entre herramientas.</p>
+
+<div class="card">
+  <p class="lbl">Origen (debe ser el mismo en las tres herramientas)</p>
+  <p class="val" id="origenActual" style="font-size:13px;"></p>
+</div>
+
+<div id="alertaVersion"></div>
+
+<p class="section-label" style="margin-top:0;">Hipótesis guardadas ahora mismo</p>
+<p class="muted" style="margin:0 0 10px;">Esta es la lista real, leída directamente — si algo no aparece aquí, no está guardado, sin importar qué muestre otra pantalla.</p>
+<div id="hipotesisList"></div>
+<p class="muted" id="sinHipotesis" style="display:none;">No hay ninguna hipótesis guardada en este navegador ahora mismo.</p>
+
+<p class="section-label">Datos crudos (JSON)</p>
+<pre id="rawData"></pre>
+
+<button type="button" onclick="location.reload()">Actualizar diagnóstico</button>
+<button type="button" onclick="copiarDiagnostico()" id="btnCopiar">Copiar diagnóstico completo</button>
+<p class="muted" id="copiadoMsg" style="display:none; color:#2a9d4f;">Copiado — puedes pegarlo en un mensaje.</p>
+
+<script>
+var HIPOTESIS_KEY = 'meco_t_hipotesis_v1';
+
+document.getElementById('origenActual').textContent = location.protocol + '//' + location.host;
+
+function cargarHipotesis() {
+  try {
+    var raw = localStorage.getItem(HIPOTESIS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+
+var lista = cargarHipotesis();
+var el = document.getElementById('hipotesisList');
+var vacio = document.getElementById('sinHipotesis');
+if (lista.length === 0) {
+  vacio.style.display = 'block';
+} else {
+  vacio.style.display = 'none';
+  var html = '';
+  for (var i=0;i<lista.length;i++) {
+    html += '<div class="hip-row">' + (i+1) + '. ' + lista[i] + '</div>';
+  }
+  el.innerHTML = html;
+}
+
+document.getElementById('rawData').textContent = JSON.stringify(lista, null, 2);
+
+var alertaEl = document.getElementById('alertaVersion');
+if (location.protocol === 'file:') {
+  alertaEl.innerHTML = '<div class="warn">Estás abriendo este archivo como archivo local (file://), no desde la dirección web real. Los datos que veas aquí NO son los mismos que usan las otras herramientas si esas las abriste desde aldoschwarzcpp.github.io. Cierra esto y ábrelo desde la dirección web real.</div>';
+} else if (location.host.indexOf('github.io') === -1) {
+  alertaEl.innerHTML = '<div class="warn">La dirección actual no es aldoschwarzcpp.github.io — si las otras herramientas SÍ están en esa dirección, esta página no comparte los mismos datos.</div>';
+} else {
+  alertaEl.innerHTML = '<div class="ok">Origen correcto — si las otras herramientas también se abrieron desde aldoschwarzcpp.github.io en este mismo navegador, deberían compartir exactamente esta lista.</div>';
+}
+
+function copiarDiagnostico() {
+  var texto = 'DIAGNÓSTICO MECO-T\n';
+  texto += 'Fecha: ' + new Date().toString() + '\n';
+  texto += 'Origen: ' + location.protocol + '//' + location.host + '\n';
+  texto += 'Total hipótesis: ' + lista.length + '\n\n';
+  texto += JSON.stringify(lista, null, 2);
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(texto).then(function(){
+      document.getElementById('copiadoMsg').style.display = 'block';
+      setTimeout(function(){ document.getElementById('copiadoMsg').style.display = 'none'; }, 3000);
+    });
+  }
+}
+</script>
+</body>
+</html>
