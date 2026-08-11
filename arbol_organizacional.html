@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECO-T — Configuración del Árbol Organizacional</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    background: #FFFFFF;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p.subtitle { font-size: 13px; color: #666; margin: 0 0 24px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+  }
+  button:active { background: #f0f0f0; }
+  button.active { border-color: #2a78d6; color: #2a78d6; border-width: 2px; }
+  input, select {
+    font-family: inherit;
+    font-size: 14px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: #fff;
+  }
+  .section-label { font-size: 13px; color: #666; margin: 20px 0 8px; }
+  .card { background: #f7f7f5; border-radius: 10px; padding: 14px; margin-bottom: 20px; }
+  .node-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 0; border-bottom: 1px solid #e5e5e3; font-size: 14px;
+  }
+  .node-row .label { flex: 1; }
+  .node-row button { padding: 6px 12px; font-size: 12px; flex-shrink: 0; }
+  .tag {
+    font-size: 10px; color: #2a78d6; border: 1px solid #2a78d6;
+    border-radius: 4px; padding: 1px 6px; margin-left: 6px;
+  }
+  .muted { font-size: 11px; color: #999; }
+  .full-btn { width: 100%; margin-top: 8px; padding: 12px; }
+  .danger { border-color: #c0392b; color: #c0392b; }
+  .form-actions { display: flex; gap: 8px; }
+  .form-actions button:first-child { flex: 1; }
+  #saveStatus {
+    font-size: 12px; color: #2a9d4f; margin-top: 8px; display: none;
+  }
+  #chartScroll {
+    overflow-x: auto; overflow-y: hidden; border: 1px solid #e5e5e3;
+    border-radius: 10px; background: #fafaf8; margin-bottom: 20px;
+  }
+  .chart-hint { font-size: 11px; color: #999; margin: 4px 0 20px; }
+  .toggle-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .toggle-row button { flex: 1; }
+  .persona-row { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:13px; border-bottom:1px solid #eee; }
+  .badge-ok { font-size:10px; color:#2a9d4f; border:1px solid #2a9d4f; border-radius:4px; padding:1px 6px; }
+  .badge-no { font-size:10px; color:#c0392b; border:1px solid #c0392b; border-radius:4px; padding:1px 6px; }
+  .badge-pend { font-size:10px; color:#c98a1f; border:1px solid #c98a1f; border-radius:4px; padding:1px 6px; }
+</style>
+</head>
+<body>
+
+<h1>Configuración del Árbol Organizacional</h1>
+<p class="subtitle">MECO-T Field Workbook — herramienta independiente, funciona sin conexión</p>
+
+<p class="section-label" style="margin-top:0;">Organigrama gráfico — para mostrar y validar con el entrevistado</p>
+<div id="chartScroll">
+  <svg id="orgChart" width="100%" height="200"></svg>
+</div>
+<p class="chart-hint">Este gráfico se actualiza solo a medida que agregas o editas nodos abajo.</p>
+
+<div class="row2">
+  <button type="button" onclick="setMatricial(false)" id="btnNoMatricial">No matricial</button>
+  <button type="button" onclick="setMatricial(true)" id="btnSiMatricial">Matricial</button>
+</div>
+<div class="row2" style="margin-bottom:20px;">
+  <button type="button" onclick="setRegimen(false)" id="btnNoRegimen">Sin régimen rotativo</button>
+  <button type="button" onclick="setRegimen(true)" id="btnSiRegimen">Régimen 14x7 u otro</button>
+</div>
+<div id="cicloInput" style="display:none; margin-bottom:20px;">
+  <input id="ciclo" type="text" placeholder="Ciclo (ej: 14 días trabajo / 7 descanso)">
+</div>
+
+<p class="section-label">Nodos del organigrama</p>
+<div id="nodosList"></div>
+
+<div class="card">
+  <p id="formLabel" class="muted" style="margin:0 0 8px;">Nuevo nodo</p>
+  <input id="nombreNodo" type="text" placeholder="Nombre del cargo (según organigrama del cliente)">
+  <label class="muted" style="display:block; margin-bottom:4px;">DEPENDE DE (padre en la jerarquía)</label>
+  <select id="padreNodo"></select>
+  <select id="lineaMando" style="display:none;">
+    <option>Funcional</option>
+    <option>Proyecto</option>
+  </select>
+  <div class="form-actions">
+    <button type="button" onclick="saveNodo()" id="btnGuardar">Agregar</button>
+    <button type="button" onclick="cancelEdit()" id="btnCancelar" style="display:none;">Cancelar</button>
+    <button type="button" onclick="deleteNodo()" id="btnEliminar" class="danger" style="display:none;">Eliminar</button>
+  </div>
+</div>
+
+<div class="card" id="personasCard" style="display:none;">
+  <p class="muted" style="margin:0 0 8px;">Personas que asumen este puesto (titular, relevo, descansero)</p>
+  <div id="personasList"></div>
+  <input id="nombrePersona" type="text" placeholder="Nombre de la persona">
+  <div class="row2">
+    <select id="tipoTitular">
+      <option>Titular</option>
+      <option>Relevo</option>
+      <option>Descansero</option>
+    </select>
+    <select id="habilitadaPersona">
+      <option value="si">Habilitado</option>
+      <option value="no">No habilitado</option>
+      <option value="pendiente">Pendiente de evaluar</option>
+    </select>
+  </div>
+  <button type="button" onclick="addPersona()" class="full-btn">Agregar persona a este puesto</button>
+</div>
+
+<p class="section-label">Relevos — quién cubre a quién (no es jerarquía)</p>
+<div id="relevosList"></div>
+<div class="row2" style="grid-template-columns: 1fr auto 1fr; align-items:center;">
+  <select id="relevoQuien"></select>
+  <span class="muted">cubre a</span>
+  <select id="relevoAQuien"></select>
+</div>
+<button type="button" onclick="addRelevo()" class="full-btn">Registrar relevo</button>
+
+<button type="button" onclick="exportData()" class="full-btn" style="margin-top:24px; background:#1a1a1a; color:#fff;">Exportar configuración (JSON)</button>
+<p id="saveStatus">Descarga iniciada — revisa tus Descargas.</p>
+
+<script>
+var matricial = false;
+var regimenActivo = false;
+var nodos = [{id:0, n:'Raíz de la Auditoría', padre:null, linea:null, personas:[]}];
+var relevos = [];
+var editingId = null;
+
+function setMatricial(v) {
+  matricial = v;
+  document.getElementById('btnNoMatricial').className = !v ? 'active' : '';
+  document.getElementById('btnSiMatricial').className = v ? 'active' : '';
+  document.getElementById('lineaMando').style.display = v ? 'block' : 'none';
+}
+function setRegimen(v) {
+  regimenActivo = v;
+  document.getElementById('btnNoRegimen').className = !v ? 'active' : '';
+  document.getElementById('btnSiRegimen').className = v ? 'active' : '';
+  document.getElementById('cicloInput').style.display = v ? 'block' : 'none';
+}
+function esDescendiente(candidatoId, ancestroId) {
+  var cur = null;
+  for (var i=0;i<nodos.length;i++) { if (nodos[i].id===candidatoId) cur = nodos[i]; }
+  while (cur && cur.padre !== null) {
+    if (cur.padre === ancestroId) return true;
+    var next = null;
+    for (var j=0;j<nodos.length;j++) { if (nodos[j].id===cur.padre) next = nodos[j]; }
+    cur = next;
+  }
+  return false;
+}
+function calcDepth(n) {
+  var d = 0, cur = n;
+  while (cur.padre !== null) {
+    var next = null;
+    for (var i=0;i<nodos.length;i++) { if (nodos[i].id===cur.padre) next = nodos[i]; }
+    cur = next; d++;
+  }
+  return d;
+}
+function refreshPadreOptions() {
+  var sel = document.getElementById('padreNodo');
+  var disponibles = [];
+  for (var i=0;i<nodos.length;i++) {
+    var n = nodos[i];
+    if (editingId===null || (n.id !== editingId && !esDescendiente(n.id, editingId))) disponibles.push(n);
+  }
+  var html = '';
+  for (var i=0;i<disponibles.length;i++) { html += '<option value="'+disponibles[i].id+'">'+disponibles[i].n+'</option>'; }
+  sel.innerHTML = html;
+}
+function refreshRelevoOptions() {
+  var ids = ['relevoQuien','relevoAQuien'];
+  for (var k=0;k<ids.length;k++) {
+    var html = '';
+    for (var i=0;i<nodos.length;i++) { if (nodos[i].id!==0) html += '<option value="'+nodos[i].id+'">'+nodos[i].n+'</option>'; }
+    document.getElementById(ids[k]).innerHTML = html;
+  }
+}
+function hijosDe(id) {
+  var r = [];
+  for (var i=0;i<nodos.length;i++) { if (nodos[i].padre === id) r.push(nodos[i]); }
+  return r;
+}
+function contarHojas(n) {
+  var h = hijosDe(n.id);
+  if (h.length === 0) return 1;
+  var total = 0;
+  for (var i=0;i<h.length;i++) { total += contarHojas(h[i]); }
+  return total;
+}
+function asignarPosiciones(n, xInicio, depth, posiciones) {
+  var h = hijosDe(n.id);
+  var ancho = contarHojas(n);
+  if (h.length === 0) {
+    posiciones[n.id] = { x: xInicio + 0.5, y: depth };
+    return xInicio + 1;
+  }
+  var cursor = xInicio;
+  var centros = [];
+  for (var i=0;i<h.length;i++) {
+    var antes = cursor;
+    cursor = asignarPosiciones(h[i], cursor, depth+1, posiciones);
+    centros.push(posiciones[h[i].id].x);
+  }
+  var suma = 0;
+  for (var i=0;i<centros.length;i++) suma += centros[i];
+  posiciones[n.id] = { x: suma / centros.length, y: depth };
+  return cursor;
+}
+function drawChart() {
+  var svg = document.getElementById('orgChart');
+  var posiciones = {};
+  asignarPosiciones(nodos[0], 0, 0, posiciones);
+
+  var colW = 100, rowH = 70, boxW = 88, boxH = 40;
+  var maxDepth = 0, maxX = 0;
+  for (var id in posiciones) {
+    if (posiciones[id].y > maxDepth) maxDepth = posiciones[id].y;
+    if (posiciones[id].x > maxX) maxX = posiciones[id].x;
+  }
+  var totalW = Math.max((maxX + 1) * colW, 300);
+  var totalH = (maxDepth + 1) * rowH + 20;
+  svg.setAttribute('width', totalW);
+  svg.setAttribute('height', totalH);
+  svg.setAttribute('viewBox', '0 0 ' + totalW + ' ' + totalH);
+
+  var svgns = 'http://www.w3.org/2000/svg';
+  svg.innerHTML = '';
+
+  for (var i=0;i<nodos.length;i++) {
+    var n = nodos[i];
+    if (n.padre === null) continue;
+    var pPos = posiciones[n.padre];
+    var cPos = posiciones[n.id];
+    if (!pPos || !cPos) continue;
+    var x1 = pPos.x * colW, y1 = pPos.y * rowH + boxH + 10;
+    var x2 = cPos.x * colW, y2 = cPos.y * rowH + 10;
+    var midY = (y1 + y2) / 2;
+    var path = document.createElementNS(svgns, 'path');
+    path.setAttribute('d', 'M'+x1+','+y1+' C'+x1+','+midY+' '+x2+','+midY+' '+x2+','+y2);
+    path.setAttribute('stroke', '#bbb');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke-width', '1.5');
+    svg.appendChild(path);
+  }
+
+  for (var id in posiciones) {
+    var n = null;
+    for (var i=0;i<nodos.length;i++) { if (nodos[i].id === Number(id)) n = nodos[i]; }
+    var pos = posiciones[id];
+    var cx = pos.x * colW, cy = pos.y * rowH + 10;
+    var g = document.createElementNS(svgns, 'g');
+    var rect = document.createElementNS(svgns, 'rect');
+    rect.setAttribute('x', cx - boxW/2);
+    rect.setAttribute('y', cy);
+    rect.setAttribute('width', boxW);
+    rect.setAttribute('height', boxH);
+    rect.setAttribute('rx', 6);
+    rect.setAttribute('fill', n.linea === 'Proyecto' ? '#fdf0e0' : (n.id===0 ? '#eee' : '#e6f1fb'));
+    var tieneNoHabilitado = n.personas && n.personas.some(function(p){ return p.hab === 'no'; });
+    rect.setAttribute('stroke', tieneNoHabilitado ? '#c0392b' : (n.linea === 'Proyecto' ? '#d68a1f' : (n.id===0 ? '#999' : '#378ADD')));
+    rect.setAttribute('stroke-width', tieneNoHabilitado ? '2.5' : '1');
+    g.appendChild(rect);
+
+    if (tieneNoHabilitado) {
+      var alertCircle = document.createElementNS(svgns, 'circle');
+      alertCircle.setAttribute('cx', cx + boxW/2 - 6);
+      alertCircle.setAttribute('cy', cy + 6);
+      alertCircle.setAttribute('r', 5);
+      alertCircle.setAttribute('fill', '#c0392b');
+      g.appendChild(alertCircle);
+      var alertText = document.createElementNS(svgns, 'text');
+      alertText.setAttribute('x', cx + boxW/2 - 6);
+      alertText.setAttribute('y', cy + 9);
+      alertText.setAttribute('text-anchor', 'middle');
+      alertText.setAttribute('font-size', '9');
+      alertText.setAttribute('fill', '#fff');
+      alertText.textContent = '!';
+      g.appendChild(alertText);
+    }
+
+    var texto = n.n.length > 16 ? n.n.slice(0,15) + '…' : n.n;
+    var lines = wrapText(n.n, 14);
+    for (var li=0; li<lines.length && li<2; li++) {
+      var t = document.createElementNS(svgns, 'text');
+      t.setAttribute('x', cx);
+      t.setAttribute('y', cy + 16 + (li*13));
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('font-size', '10');
+      t.setAttribute('font-family', '-apple-system, sans-serif');
+      t.setAttribute('fill', '#222');
+      t.textContent = lines[li];
+      g.appendChild(t);
+    }
+    svg.appendChild(g);
+  }
+}
+function wrapText(str, maxChars) {
+  var words = str.split(' ');
+  var lines = [];
+  var cur = '';
+  for (var i=0;i<words.length;i++) {
+    var test = cur ? cur + ' ' + words[i] : words[i];
+    if (test.length > maxChars && cur) { lines.push(cur); cur = words[i]; }
+    else { cur = test; }
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+function drawNodos() {
+  drawChart();
+  var el = document.getElementById('nodosList');
+  el.innerHTML = '';
+  for (var i=0;i<nodos.length;i++) {
+    (function(n){
+      var depth = calcDepth(n);
+      var row = document.createElement('div');
+      row.className = 'node-row';
+      row.style.paddingLeft = (depth*16) + 'px';
+      var lineaTag = n.linea ? ' <span class="tag">'+n.linea+'</span>' : '';
+      var label = document.createElement('span');
+      label.className = 'label';
+      label.innerHTML = (depth>0 ? '&#8618; ' : '') + n.n + lineaTag;
+      row.appendChild(label);
+      if (n.id !== 0) {
+        var editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.textContent = 'Editar';
+        editBtn.onclick = function(){ startEdit(n.id); };
+        row.appendChild(editBtn);
+      } else {
+        var tag = document.createElement('span');
+        tag.className = 'muted';
+        tag.textContent = 'raíz';
+        row.appendChild(tag);
+      }
+      el.appendChild(row);
+    })(nodos[i]);
+  }
+  refreshPadreOptions();
+  refreshRelevoOptions();
+  drawRelevos();
+}
+function startEdit(id) {
+  editingId = id;
+  var n = null;
+  for (var i=0;i<nodos.length;i++) { if (nodos[i].id===id) n = nodos[i]; }
+  document.getElementById('nombreNodo').value = n.n;
+  document.getElementById('formLabel').textContent = 'Editando: ' + n.n;
+  document.getElementById('btnGuardar').textContent = 'Guardar cambios';
+  document.getElementById('btnCancelar').style.display = 'inline-block';
+  document.getElementById('btnEliminar').style.display = 'inline-block';
+  refreshPadreOptions();
+  document.getElementById('padreNodo').value = n.padre;
+  if (n.linea) document.getElementById('lineaMando').value = n.linea;
+  document.getElementById('personasCard').style.display = 'block';
+  if (!n.personas) n.personas = [];
+  drawPersonas();
+}
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('nombreNodo').value = '';
+  document.getElementById('formLabel').textContent = 'Nuevo nodo';
+  document.getElementById('btnGuardar').textContent = 'Agregar';
+  document.getElementById('btnCancelar').style.display = 'none';
+  document.getElementById('btnEliminar').style.display = 'none';
+  document.getElementById('personasCard').style.display = 'none';
+  refreshPadreOptions();
+}
+function drawPersonas() {
+  var n = null;
+  for (var i=0;i<nodos.length;i++) { if (nodos[i].id===editingId) n = nodos[i]; }
+  if (!n) return;
+  var el = document.getElementById('personasList');
+  el.innerHTML = '';
+  if (!n.personas || n.personas.length === 0) {
+    el.innerHTML = '<p class="muted" style="margin:0 0 8px;">Sin personas registradas todavía.</p>';
+    return;
+  }
+  for (var i=0;i<n.personas.length;i++) {
+    (function(p, idx){
+      var row = document.createElement('div');
+      row.className = 'persona-row';
+      var badgeClass = p.hab === 'si' ? 'badge-ok' : (p.hab === 'no' ? 'badge-no' : 'badge-pend');
+      var badgeText = p.hab === 'si' ? 'Habilitado' : (p.hab === 'no' ? 'No habilitado' : 'Pendiente');
+      row.innerHTML = '<span style="flex:1;">'+p.nombre+' <span class="muted">('+p.tipo+')</span></span><span class="'+badgeClass+'">'+badgeText+'</span>';
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.textContent = 'Quitar';
+      del.style.marginLeft = '6px';
+      del.onclick = function(){ n.personas.splice(idx,1); drawPersonas(); drawChart(); };
+      row.appendChild(del);
+      el.appendChild(row);
+    })(n.personas[i], i);
+  }
+}
+function addPersona() {
+  var nombre = document.getElementById('nombrePersona').value.trim();
+  if (!nombre || editingId === null) return;
+  var n = null;
+  for (var i=0;i<nodos.length;i++) { if (nodos[i].id===editingId) n = nodos[i]; }
+  if (!n.personas) n.personas = [];
+  n.personas.push({
+    nombre: nombre,
+    tipo: document.getElementById('tipoTitular').value,
+    hab: document.getElementById('habilitadaPersona').value
+  });
+  document.getElementById('nombrePersona').value = '';
+  drawPersonas();
+  drawChart();
+}
+function saveNodo() {
+  var nombre = document.getElementById('nombreNodo').value.trim();
+  if (!nombre) return;
+  var padreId = Number(document.getElementById('padreNodo').value);
+  var linea = matricial ? document.getElementById('lineaMando').value : null;
+  if (editingId !== null) {
+    var n = null;
+    for (var i=0;i<nodos.length;i++) { if (nodos[i].id===editingId) n = nodos[i]; }
+    n.n = nombre; n.padre = padreId; n.linea = linea;
+  } else {
+    nodos.push({id: nodos.length, n: nombre, padre: padreId, linea: linea});
+  }
+  cancelEdit();
+  drawNodos();
+}
+function deleteNodo() {
+  var tieneHijos = false;
+  for (var i=0;i<nodos.length;i++) { if (nodos[i].padre === editingId) tieneHijos = true; }
+  if (tieneHijos) { alert('Este nodo tiene subordinados. Reasigna o elimina esos nodos primero.'); return; }
+  var nuevos = [];
+  for (var i=0;i<nodos.length;i++) { if (nodos[i].id !== editingId) nuevos.push(nodos[i]); }
+  nodos = nuevos;
+  var nuevosRelevos = [];
+  for (var i=0;i<relevos.length;i++) { if (relevos[i].quien !== editingId && relevos[i].aquien !== editingId) nuevosRelevos.push(relevos[i]); }
+  relevos = nuevosRelevos;
+  cancelEdit();
+  drawNodos();
+}
+function drawRelevos() {
+  var el = document.getElementById('relevosList');
+  el.innerHTML = '';
+  for (var i=0;i<relevos.length;i++) {
+    (function(r, idx){
+      var nq = null, na = null;
+      for (var k=0;k<nodos.length;k++) { if (nodos[k].id===r.quien) nq = nodos[k]; if (nodos[k].id===r.aquien) na = nodos[k]; }
+      if (!nq || !na) return;
+      var row = document.createElement('div');
+      row.className = 'node-row';
+      row.innerHTML = '<span class="label">'+nq.n+' cubre a '+na.n+'</span>';
+      var del = document.createElement('button');
+      del.type = 'button';
+      del.textContent = 'Quitar';
+      del.onclick = function(){ relevos.splice(idx,1); drawRelevos(); };
+      row.appendChild(del);
+      el.appendChild(row);
+    })(relevos[i], i);
+  }
+}
+function addRelevo() {
+  var quien = Number(document.getElementById('relevoQuien').value);
+  var aquien = Number(document.getElementById('relevoAQuien').value);
+  if (quien === aquien || isNaN(quien) || isNaN(aquien)) return;
+  relevos.push({quien: quien, aquien: aquien});
+  drawRelevos();
+}
+function exportData() {
+  var data = {
+    matricial: matricial,
+    regimen: regimenActivo,
+    ciclo: document.getElementById('ciclo').value,
+    nodos: nodos,
+    relevos: relevos,
+    fecha_exportacion: new Date().toISOString()
+  };
+  var blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'arbol_organizacional_meco-t.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  var status = document.getElementById('saveStatus');
+  status.style.display = 'block';
+  setTimeout(function(){ status.style.display = 'none'; }, 4000);
+}
+
+setMatricial(false);
+setRegimen(false);
+drawNodos();
+</script>
+</body>
+</html>
