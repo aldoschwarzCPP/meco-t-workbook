@@ -66,21 +66,18 @@
   </div>
 </div>
 
+<p id="breadcrumb" class="muted" style="margin:0 0 8px; font-size:13px;"></p>
+<div id="nivelHeader" style="margin-bottom:12px;"></div>
+
 <div class="card">
-  <p class="section-label" style="margin-top:0;">Agregar a la estructura</p>
-  <p class="muted" style="margin:0 0 8px;">Escribe solo Gestión para crear una categoría nueva. Agrega Proceso para anidarlo dentro de ella. Agrega Aspecto para anidarlo dentro del Proceso.</p>
-  <label class="field-label">Gestión</label>
-  <input id="inGestion" type="text" placeholder="Ej: Gestión Explosivos">
-  <label class="field-label">Proceso (opcional)</label>
-  <input id="inProceso" type="text" placeholder="Ej: Recepción y Almacenamiento">
-  <label class="field-label">Aspecto (opcional, requiere Proceso)</label>
-  <input id="inAspecto" type="text" placeholder="Ej: Control de inventario">
-  <button type="button" class="primary" onclick="agregarNodo()">Agregar</button>
+  <p class="section-label" style="margin-top:0;" id="agregarLabel">Agregar Gestión</p>
+  <input id="inNuevoNombre" type="text" placeholder="Ej: Gestión Explosivos">
+  <button type="button" class="primary" onclick="agregarEnNivelActual()">Agregar</button>
 </div>
 
-<p class="section-label" style="margin-top:0;">Estructura vigente para esta auditoría</p>
-<div id="arbolView"></div>
-<p class="muted" id="sinArbol" style="display:none;">Todavía no hay ninguna Gestión configurada para esta auditoría.</p>
+<p class="section-label" style="margin-top:0;" id="listaLabel">Gestiones de esta auditoría</p>
+<div id="listaNivel"></div>
+<p class="muted" id="listaVacia" style="display:none;">Todavía no hay nada aquí — agrégalo arriba.</p>
 
 <p class="section-label">Reiniciar esta auditoría</p>
 <p class="muted" style="margin:0 0 8px;">Borra la estructura completa de la auditoría actualmente seleccionada arriba — las demás auditorías no se ven afectadas.</p>
@@ -135,7 +132,8 @@ function onAuditoriaSelectChange() {
     document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
     establecerAuditoriaActual(sel.value);
     renderAuditoriaSelector();
-    renderArbol();
+    nivelActual = 'gestiones'; gestionActiva = null; procesoActivo = null;
+    render();
   }
 }
 function confirmarNuevaAuditoria() {
@@ -145,7 +143,8 @@ function confirmarNuevaAuditoria() {
   document.getElementById('nuevaAuditoriaTexto').value = '';
   document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
   renderAuditoriaSelector();
-  renderArbol();
+  nivelActual = 'gestiones'; gestionActiva = null; procesoActivo = null;
+  render();
 }
 renderAuditoriaSelector();
 
@@ -159,24 +158,44 @@ function guardarArbol(arbol) {
   try { localStorage.setItem(getArbolKey(), JSON.stringify(arbol)); } catch (e) {}
 }
 
-function agregarNodo() {
-  var g = document.getElementById('inGestion').value.trim();
-  var p = document.getElementById('inProceso').value.trim();
-  var a = document.getElementById('inAspecto').value.trim();
-  if (!g) { alert('Escribe al menos el nombre de la Gestión.'); return; }
-  if (a && !p) { alert('Para agregar un Aspecto, primero indica a qué Proceso pertenece.'); return; }
+var nivelActual = 'gestiones';
+var gestionActiva = null;
+var procesoActivo = null;
 
+function irANivel(nivel, g, p) {
+  nivelActual = nivel;
+  gestionActiva = g || null;
+  procesoActivo = p || null;
+  document.getElementById('inNuevoNombre').value = '';
+  render();
+}
+
+function agregarEnNivelActual() {
+  var nombre = document.getElementById('inNuevoNombre').value.trim();
+  if (!nombre) return;
   var arbol = cargarArbol();
-  if (!arbol[g]) arbol[g] = {};
-  if (p) {
-    if (!arbol[g][p]) arbol[g][p] = [];
-    if (a && arbol[g][p].indexOf(a) === -1) arbol[g][p].push(a);
+
+  if (nivelActual === 'gestiones') {
+    if (!arbol[nombre]) arbol[nombre] = {};
+    guardarArbol(arbol);
+    document.getElementById('inNuevoNombre').value = '';
+    render();
+  } else if (nivelActual === 'procesos') {
+    if (!arbol[gestionActiva]) arbol[gestionActiva] = {};
+    if (!arbol[gestionActiva][nombre]) arbol[gestionActiva][nombre] = [];
+    guardarArbol(arbol);
+    document.getElementById('inNuevoNombre').value = '';
+    render();
+  } else if (nivelActual === 'aspectos') {
+    if (!arbol[gestionActiva]) arbol[gestionActiva] = {};
+    if (!arbol[gestionActiva][procesoActivo]) arbol[gestionActiva][procesoActivo] = [];
+    if (arbol[gestionActiva][procesoActivo].indexOf(nombre) === -1) {
+      arbol[gestionActiva][procesoActivo].push(nombre);
+    }
+    guardarArbol(arbol);
+    document.getElementById('inNuevoNombre').value = '';
+    render();
   }
-  guardarArbol(arbol);
-  document.getElementById('inGestion').value = '';
-  document.getElementById('inProceso').value = '';
-  document.getElementById('inAspecto').value = '';
-  renderArbol();
 }
 
 function eliminarGestion(g) {
@@ -184,87 +203,136 @@ function eliminarGestion(g) {
   var arbol = cargarArbol();
   delete arbol[g];
   guardarArbol(arbol);
-  renderArbol();
+  render();
 }
 function eliminarProceso(g, p) {
   if (!confirm('¿Eliminar el Proceso "' + p + '" y sus Aspectos?')) return;
   var arbol = cargarArbol();
   if (arbol[g]) delete arbol[g][p];
   guardarArbol(arbol);
-  renderArbol();
+  render();
 }
 function eliminarAspecto(g, p, idx) {
   var arbol = cargarArbol();
   if (arbol[g] && arbol[g][p]) {
     arbol[g][p].splice(idx, 1);
     guardarArbol(arbol);
-    renderArbol();
+    render();
   }
 }
 
-function renderArbol() {
+function render() {
   var arbol = cargarArbol();
-  var el = document.getElementById('arbolView');
-  var vacio = document.getElementById('sinArbol');
-  var gestiones = Object.keys(arbol);
-  el.innerHTML = '';
-  if (gestiones.length === 0) { vacio.style.display = 'block'; return; }
-  vacio.style.display = 'none';
+  var breadcrumb = document.getElementById('breadcrumb');
+  var header = document.getElementById('nivelHeader');
+  var agregarLabel = document.getElementById('agregarLabel');
+  var listaLabel = document.getElementById('listaLabel');
+  var input = document.getElementById('inNuevoNombre');
+  var listaEl = document.getElementById('listaNivel');
+  var vacioEl = document.getElementById('listaVacia');
 
-  for (var i=0;i<gestiones.length;i++) {
-    (function(g){
-      var gBlock = document.createElement('div');
-      gBlock.className = 'gestion-block';
-      var gTitle = document.createElement('div');
-      gTitle.className = 'gestion-title';
-      gTitle.innerHTML = '<span>' + g + '</span>';
-      var delG = document.createElement('button');
-      delG.type = 'button';
-      delG.textContent = 'Quitar';
-      delG.onclick = function(){ eliminarGestion(g); };
-      gTitle.appendChild(delG);
-      gBlock.appendChild(gTitle);
+  header.innerHTML = '';
+  listaEl.innerHTML = '';
 
-      var procesos = Object.keys(arbol[g]);
-      for (var j=0;j<procesos.length;j++) {
-        (function(p){
-          var pBlock = document.createElement('div');
-          pBlock.className = 'proceso-block';
-          var pTitle = document.createElement('div');
-          pTitle.className = 'proceso-title';
-          pTitle.innerHTML = '<span>' + p + '</span>';
-          var delP = document.createElement('button');
-          delP.type = 'button';
-          delP.textContent = 'Quitar';
-          delP.onclick = function(){ eliminarProceso(g, p); };
-          pTitle.appendChild(delP);
-          pBlock.appendChild(pTitle);
+  if (nivelActual === 'gestiones') {
+    breadcrumb.textContent = '';
+    agregarLabel.textContent = 'Agregar Gestión';
+    input.placeholder = 'Ej: Gestión Explosivos';
+    listaLabel.textContent = 'Gestiones de esta auditoría';
 
-          var aspectos = arbol[g][p];
-          for (var k=0;k<aspectos.length;k++) {
-            (function(idx){
-              var aRow = document.createElement('div');
-              aRow.className = 'aspecto-row';
-              var span = document.createElement('span');
-              span.className = 'txt';
-              span.textContent = aspectos[idx];
-              aRow.appendChild(span);
-              var delA = document.createElement('button');
-              delA.type = 'button';
-              delA.textContent = 'Quitar';
-              delA.onclick = function(){ eliminarAspecto(g, p, idx); };
-              aRow.appendChild(delA);
-              pBlock.appendChild(aRow);
-            })(k);
-          }
-          gBlock.appendChild(pBlock);
-        })(procesos[j]);
-      }
-      el.appendChild(gBlock);
-    })(gestiones[i]);
+    var gestiones = Object.keys(arbol);
+    if (gestiones.length === 0) { vacioEl.style.display = 'block'; return; }
+    vacioEl.style.display = 'none';
+    for (var i=0;i<gestiones.length;i++) {
+      (function(g){
+        var row = document.createElement('div');
+        row.className = 'gestion-block';
+        var procesos = Object.keys(arbol[g]);
+        row.innerHTML = '<div class="gestion-title"><span>' + g + '</span></div><p class="muted" style="margin:0;">' + procesos.length + ' proceso(s)</p>';
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex; gap:8px; margin-top:8px;';
+        var entrar = document.createElement('button');
+        entrar.type = 'button';
+        entrar.textContent = 'Entrar';
+        entrar.style.flex = '1';
+        entrar.onclick = function(){ irANivel('procesos', g); };
+        var quitar = document.createElement('button');
+        quitar.type = 'button';
+        quitar.textContent = 'Quitar';
+        quitar.onclick = function(){ eliminarGestion(g); };
+        btnRow.appendChild(entrar);
+        btnRow.appendChild(quitar);
+        row.appendChild(btnRow);
+        listaEl.appendChild(row);
+      })(gestiones[i]);
+    }
+
+  } else if (nivelActual === 'procesos') {
+    breadcrumb.innerHTML = '<span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'gestiones\')">‹ Todas las Gestiones</span>';
+    header.innerHTML = '<p style="font-size:15px; font-weight:600; margin:0;">Gestión: ' + gestionActiva + '</p>';
+    agregarLabel.textContent = 'Agregar Proceso dentro de "' + gestionActiva + '"';
+    input.placeholder = 'Ej: Recepción y Almacenamiento';
+    listaLabel.textContent = 'Procesos de esta Gestión';
+
+    if (!arbol[gestionActiva]) arbol[gestionActiva] = {};
+    var procesos = Object.keys(arbol[gestionActiva]);
+    if (procesos.length === 0) { vacioEl.style.display = 'block'; return; }
+    vacioEl.style.display = 'none';
+    for (var j=0;j<procesos.length;j++) {
+      (function(p){
+        var row = document.createElement('div');
+        row.className = 'proceso-block';
+        var aspectos = arbol[gestionActiva][p];
+        row.innerHTML = '<div class="proceso-title"><span>' + p + '</span></div><p class="muted" style="margin:0;">' + aspectos.length + ' aspecto(s)</p>';
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex; gap:8px; margin-top:8px;';
+        var entrar = document.createElement('button');
+        entrar.type = 'button';
+        entrar.textContent = 'Entrar';
+        entrar.style.flex = '1';
+        entrar.onclick = function(){ irANivel('aspectos', gestionActiva, p); };
+        var quitar = document.createElement('button');
+        quitar.type = 'button';
+        quitar.textContent = 'Quitar';
+        quitar.onclick = function(){ eliminarProceso(gestionActiva, p); };
+        btnRow.appendChild(entrar);
+        btnRow.appendChild(quitar);
+        row.appendChild(btnRow);
+        listaEl.appendChild(row);
+      })(procesos[j]);
+    }
+
+  } else if (nivelActual === 'aspectos') {
+    breadcrumb.innerHTML = '<span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'gestiones\')">‹ Todas las Gestiones</span> &nbsp;/&nbsp; <span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'procesos\', \'' + gestionActiva.replace(/'/g,"\\'") + '\')">' + gestionActiva + '</span>';
+    header.innerHTML = '<p style="font-size:15px; font-weight:600; margin:0;">Gestión: ' + gestionActiva + '<br>Proceso: ' + procesoActivo + '</p>';
+    agregarLabel.textContent = 'Agregar Aspecto dentro de "' + procesoActivo + '"';
+    input.placeholder = 'Ej: Control de inventario';
+    listaLabel.textContent = 'Aspectos de este Proceso';
+
+    var aspectos = (arbol[gestionActiva] && arbol[gestionActiva][procesoActivo]) ? arbol[gestionActiva][procesoActivo] : [];
+    if (aspectos.length === 0) { vacioEl.style.display = 'block'; return; }
+    vacioEl.style.display = 'none';
+    for (var k=0;k<aspectos.length;k++) {
+      (function(idx){
+        var row = document.createElement('div');
+        row.className = 'aspecto-row';
+        row.style.paddingLeft = '0';
+        var span = document.createElement('span');
+        span.className = 'txt';
+        span.textContent = aspectos[idx];
+        row.appendChild(span);
+        var quitar = document.createElement('button');
+        quitar.type = 'button';
+        quitar.textContent = 'Quitar';
+        quitar.onclick = function(){ eliminarAspecto(gestionActiva, procesoActivo, idx); };
+        row.appendChild(quitar);
+        listaEl.appendChild(row);
+      })(k);
+    }
   }
 }
-renderArbol();
+render();
+
 
 function borrarTodo() {
   var arbol = cargarArbol();
@@ -272,13 +340,16 @@ function borrarTodo() {
   if (Object.keys(arbol).length === 0) { alert('No hay estructura guardada para "' + nombreAud + '".'); return; }
   if (confirm('¿Borrar toda la estructura de "' + nombreAud + '"? No se puede deshacer.')) {
     guardarArbol({});
-    renderArbol();
+    nivelActual = 'gestiones';
+    gestionActiva = null;
+    procesoActivo = null;
+    render();
     alert('Estructura borrada para "' + nombreAud + '".');
   }
 }
 
-window.addEventListener('focus', function(){ renderAuditoriaSelector(); renderArbol(); });
-document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); renderArbol(); } });
+window.addEventListener('focus', function(){ renderAuditoriaSelector(); render(); });
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); render(); } });
 </script>
 </body>
 </html>
