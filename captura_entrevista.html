@@ -216,22 +216,15 @@
 </div>
 
 <script>
-var arbol = {
-  'Gestión Explosivos': {
-    'Recepción y Almacenamiento': ['Control de inventario', 'Custodia de llaves del polvorín'],
-    'Transporte Interno': ['Autorización de retiro', 'Doble custodia en traslado']
-  },
-  'Gestión Acopio': {
-    'Recepción de Mineral': ['Conciliación de peso', 'Registro de procedencia'],
-    'Control de Calidad': ['Muestreo de laboratorio']
-  },
-  'Gestión Seguridad Patrimonial': {
-    'Control de Accesos': ['Verificación de identidad', 'Registro de visitantes'],
-    'Vigilancia Perimetral': ['Rondas nocturnas']
-  },
-  'Gestión Cía Seguridad Privada A': { 'Habilitación de Agentes': ['Registro MHO', 'Capacitación por puesto'] },
-  'Gestión Cía Seguridad Privada B': { 'Habilitación de Agentes': ['Registro MHO', 'Capacitación por puesto'] }
-};
+function getArbolKey() {
+  return 'meco_t_arbol_aspectos_v1_' + slugAuditoria(obtenerAuditoriaActual());
+}
+function cargarArbol() {
+  try {
+    var raw = localStorage.getItem(getArbolKey());
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) { return {}; }
+}
 
 var consentimiento = null, seconds = 0, timerInterval = null, paused = false;
 var evidenceCount = 0, scanCount = 0, fotoOk = false;
@@ -286,6 +279,7 @@ function onAuditoriaSelectChange() {
     establecerAuditoriaActual(sel.value);
     renderAuditoriaSelector();
     renderHipotesisSelect();
+    initGestion();
   }
 }
 function confirmarNuevaAuditoria() {
@@ -296,6 +290,7 @@ function confirmarNuevaAuditoria() {
   document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
   renderAuditoriaSelector();
   renderHipotesisSelect();
+  initGestion();
 }
 renderAuditoriaSelector();
 
@@ -355,23 +350,33 @@ function fillSelect(id, options) {
   el.innerHTML = html;
 }
 function onGestionChange() {
+  var arbol = cargarArbol();
   var g = document.getElementById('gestion').value;
   var procesos = [];
-  for (var k in arbol[g]) { procesos.push(k); }
+  for (var k in (arbol[g] || {})) { procesos.push(k); }
   fillSelect('proceso', procesos);
   onProcesoChange();
 }
 function onProcesoChange() {
+  var arbol = cargarArbol();
   var g = document.getElementById('gestion').value;
   var p = document.getElementById('proceso').value;
-  fillSelect('aspecto', arbol[g][p]);
+  fillSelect('aspecto', (arbol[g] && arbol[g][p]) ? arbol[g][p] : []);
 }
-(function initGestion(){
+function initGestion(){
+  var arbol = cargarArbol();
   var gestiones = [];
   for (var k in arbol) { gestiones.push(k); }
+  if (gestiones.length === 0) {
+    fillSelect('gestion', ['Sin configurar — usa Configuración de Gestión Auditada']);
+    fillSelect('proceso', []);
+    fillSelect('aspecto', []);
+    return;
+  }
   fillSelect('gestion', gestiones);
   onGestionChange();
-})();
+}
+initGestion();
 
 function onFotoCapturada(event) {
   var file = event.target.files[0];
