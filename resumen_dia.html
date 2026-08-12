@@ -62,6 +62,16 @@
 <h1>Resumen del Día</h1>
 <p class="subtitle" id="fechaHoy">MECO-T Field Workbook — herramienta independiente, funciona sin conexión</p>
 
+<div style="background:#f7f7f5; border:1px solid #2a78d6; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
+  <label class="field-label" style="margin-bottom:2px;">Auditoría actual</label>
+  <p style="font-size:14px; font-weight:600; margin:0 0 8px;" id="auditoriaActualDisplay">Sin seleccionar</p>
+  <select id="auditoriaSelect" onchange="onAuditoriaSelectChange()" style="margin:0;"></select>
+  <div id="nuevaAuditoriaBlock" style="display:none; margin-top:8px;">
+    <input id="nuevaAuditoriaTexto" type="text" placeholder="Ej: Minera-Norte-2026">
+    <button type="button" onclick="confirmarNuevaAuditoria()" style="width:100%;">Usar esta auditoría</button>
+  </div>
+</div>
+
 <p class="section-label" style="margin-top:0;">Cifras del día</p>
 <div class="row4">
   <div class="card"><p class="lbl">Entrevistas realizadas</p><input id="numEntrevistas" type="number" min="0" style="margin:0; border:none; padding:0; font-size:22px; font-weight:600;" placeholder="0"></div>
@@ -90,17 +100,81 @@
 <a id="exportLink" href="#" download="resumen_dia_meco-t.json" style="display:none; text-align:center; width:100%; padding:13px; margin-top:10px; background:#2a9d4f; color:#fff; border-radius:8px; text-decoration:none; font-size:14px;">Guardar resumen en Archivos</a>
 
 <script>
-var HIPOTESIS_KEY = 'meco_t_hipotesis_v1';
-var AGENDA_KEY = 'meco_t_agenda_v1';
+var AUDITORIA_KEY = 'meco_t_auditoria_actual';
+var AUDITORIAS_LISTA_KEY = 'meco_t_auditorias_conocidas';
 var efectosHipotesis = {};
 
 var meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 var hoy = new Date();
 document.getElementById('fechaHoy').textContent = hoy.getDate() + ' de ' + meses[hoy.getMonth()] + ' de ' + hoy.getFullYear();
 
+function obtenerAuditoriaActual() {
+  try { return localStorage.getItem(AUDITORIA_KEY) || ''; } catch (e) { return ''; }
+}
+function obtenerAuditoriasConocidas() {
+  try {
+    var raw = localStorage.getItem(AUDITORIAS_LISTA_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function guardarAuditoriasConocidas(lista) {
+  try { localStorage.setItem(AUDITORIAS_LISTA_KEY, JSON.stringify(lista)); } catch (e) {}
+}
+function slugAuditoria(nombre) {
+  return (nombre || 'default').trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+}
+function getHipotesisKey() {
+  return 'meco_t_hipotesis_v1_' + slugAuditoria(obtenerAuditoriaActual());
+}
+function getAgendaKey() {
+  return 'meco_t_agenda_v1_' + slugAuditoria(obtenerAuditoriaActual());
+}
+function establecerAuditoriaActual(nombre) {
+  try { localStorage.setItem(AUDITORIA_KEY, nombre); } catch (e) {}
+  var lista = obtenerAuditoriasConocidas();
+  if (lista.indexOf(nombre) === -1) { lista.push(nombre); guardarAuditoriasConocidas(lista); }
+}
+function renderAuditoriaSelector() {
+  var actual = obtenerAuditoriaActual();
+  document.getElementById('auditoriaActualDisplay').textContent = actual || 'Sin seleccionar todavía';
+  var conocidas = obtenerAuditoriasConocidas();
+  var sel = document.getElementById('auditoriaSelect');
+  var html = '';
+  if (!actual) html += '<option value="">Elige o crea una auditoría</option>';
+  for (var i=0;i<conocidas.length;i++) {
+    html += '<option value="' + conocidas[i].replace(/"/g,'&quot;') + '">' + conocidas[i] + '</option>';
+  }
+  html += '<option value="__nueva__">+ Nueva auditoría</option>';
+  sel.innerHTML = html;
+  if (actual) sel.value = actual;
+}
+function onAuditoriaSelectChange() {
+  var sel = document.getElementById('auditoriaSelect');
+  if (sel.value === '__nueva__') {
+    document.getElementById('nuevaAuditoriaBlock').style.display = 'block';
+  } else if (sel.value) {
+    document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
+    establecerAuditoriaActual(sel.value);
+    renderAuditoriaSelector();
+    renderHipotesis();
+    renderAgenda();
+  }
+}
+function confirmarNuevaAuditoria() {
+  var texto = document.getElementById('nuevaAuditoriaTexto').value.trim();
+  if (!texto) return;
+  establecerAuditoriaActual(texto);
+  document.getElementById('nuevaAuditoriaTexto').value = '';
+  document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
+  renderAuditoriaSelector();
+  renderHipotesis();
+  renderAgenda();
+}
+renderAuditoriaSelector();
+
 function cargarHipotesis() {
   try {
-    var raw = localStorage.getItem(HIPOTESIS_KEY);
+    var raw = localStorage.getItem(getHipotesisKey());
     return raw ? JSON.parse(raw) : [];
   } catch (e) { return []; }
 }
@@ -149,18 +223,18 @@ function renderHipotesis() {
   }
 }
 renderHipotesis();
-window.addEventListener('storage', function(e){ if (e.key === HIPOTESIS_KEY) renderHipotesis(); });
-window.addEventListener('focus', renderHipotesis);
-document.addEventListener('visibilitychange', function(){ if (!document.hidden) renderHipotesis(); });
+window.addEventListener('storage', function(e){ if (e.key === getHipotesisKey() || e.key === AUDITORIA_KEY) { renderAuditoriaSelector(); renderHipotesis(); renderAgenda(); } });
+window.addEventListener('focus', function(){ renderAuditoriaSelector(); renderHipotesis(); renderAgenda(); });
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); renderHipotesis(); renderAgenda(); } });
 
 function cargarAgenda() {
   try {
-    var raw = localStorage.getItem(AGENDA_KEY);
+    var raw = localStorage.getItem(getAgendaKey());
     return raw ? JSON.parse(raw) : [];
   } catch (e) { return []; }
 }
 function guardarAgenda(lista) {
-  try { localStorage.setItem(AGENDA_KEY, JSON.stringify(lista)); } catch (e) {}
+  try { localStorage.setItem(getAgendaKey(), JSON.stringify(lista)); } catch (e) {}
 }
 function renderAgenda() {
   var lista = cargarAgenda();
@@ -208,6 +282,7 @@ function prepararExportacion() {
     hipData.push({ hipotesis: lista[i], efecto: efectosHipotesis[lista[i]] || 'sin cambio' });
   }
   var data = {
+    auditoria: obtenerAuditoriaActual(),
     fecha: document.getElementById('fechaHoy').textContent,
     entrevistas_realizadas: document.getElementById('numEntrevistas').value || 0,
     evidencias_capturadas: document.getElementById('numEvidencias').value || 0,
