@@ -66,6 +66,16 @@
 <h1>Captura de Entrevista</h1>
 <p class="subtitle">MECO-T Field Workbook — herramienta independiente, funciona sin conexión</p>
 
+<div style="background:#f7f7f5; border:1px solid #2a78d6; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
+  <label class="field-label" style="margin-bottom:2px;">Auditoría actual</label>
+  <p style="font-size:14px; font-weight:600; margin:0 0 8px;" id="auditoriaActualDisplay">Sin seleccionar</p>
+  <select id="auditoriaSelect" onchange="onAuditoriaSelectChange()" style="margin:0;"></select>
+  <div id="nuevaAuditoriaBlock" style="display:none; margin-top:8px;">
+    <input id="nuevaAuditoriaTexto" type="text" placeholder="Ej: Minera-Norte-2026">
+    <button type="button" onclick="confirmarNuevaAuditoria()" style="width:100%;">Usar esta auditoría</button>
+  </div>
+</div>
+
 <div class="dots">
   <div class="dot active" id="dot1"></div>
   <div class="dot" id="dot2"></div>
@@ -227,15 +237,76 @@ var consentimiento = null, seconds = 0, timerInterval = null, paused = false;
 var evidenceCount = 0, scanCount = 0, fotoOk = false;
 var efectoHipotesis = null;
 
-var HIPOTESIS_KEY = 'meco_t_hipotesis_v1';
+var AUDITORIA_KEY = 'meco_t_auditoria_actual';
+var AUDITORIAS_LISTA_KEY = 'meco_t_auditorias_conocidas';
+
+function obtenerAuditoriaActual() {
+  try { return localStorage.getItem(AUDITORIA_KEY) || ''; } catch (e) { return ''; }
+}
+function obtenerAuditoriasConocidas() {
+  try {
+    var raw = localStorage.getItem(AUDITORIAS_LISTA_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function guardarAuditoriasConocidas(lista) {
+  try { localStorage.setItem(AUDITORIAS_LISTA_KEY, JSON.stringify(lista)); } catch (e) {}
+}
+function slugAuditoria(nombre) {
+  return (nombre || 'default').trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+}
+function getHipotesisKey() {
+  return 'meco_t_hipotesis_v1_' + slugAuditoria(obtenerAuditoriaActual());
+}
+function establecerAuditoriaActual(nombre) {
+  try { localStorage.setItem(AUDITORIA_KEY, nombre); } catch (e) {}
+  var lista = obtenerAuditoriasConocidas();
+  if (lista.indexOf(nombre) === -1) { lista.push(nombre); guardarAuditoriasConocidas(lista); }
+}
+function renderAuditoriaSelector() {
+  var actual = obtenerAuditoriaActual();
+  document.getElementById('auditoriaActualDisplay').textContent = actual || 'Sin seleccionar todavía';
+  var conocidas = obtenerAuditoriasConocidas();
+  var sel = document.getElementById('auditoriaSelect');
+  var html = '';
+  if (!actual) html += '<option value="">Elige o crea una auditoría</option>';
+  for (var i=0;i<conocidas.length;i++) {
+    html += '<option value="' + conocidas[i].replace(/"/g,'&quot;') + '">' + conocidas[i] + '</option>';
+  }
+  html += '<option value="__nueva__">+ Nueva auditoría</option>';
+  sel.innerHTML = html;
+  if (actual) sel.value = actual;
+}
+function onAuditoriaSelectChange() {
+  var sel = document.getElementById('auditoriaSelect');
+  if (sel.value === '__nueva__') {
+    document.getElementById('nuevaAuditoriaBlock').style.display = 'block';
+  } else if (sel.value) {
+    document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
+    establecerAuditoriaActual(sel.value);
+    renderAuditoriaSelector();
+    renderHipotesisSelect();
+  }
+}
+function confirmarNuevaAuditoria() {
+  var texto = document.getElementById('nuevaAuditoriaTexto').value.trim();
+  if (!texto) return;
+  establecerAuditoriaActual(texto);
+  document.getElementById('nuevaAuditoriaTexto').value = '';
+  document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
+  renderAuditoriaSelector();
+  renderHipotesisSelect();
+}
+renderAuditoriaSelector();
+
 function cargarHipotesis() {
   try {
-    var raw = localStorage.getItem(HIPOTESIS_KEY);
+    var raw = localStorage.getItem(getHipotesisKey());
     return raw ? JSON.parse(raw) : [];
   } catch (e) { return []; }
 }
 function guardarListaHipotesis(lista) {
-  try { localStorage.setItem(HIPOTESIS_KEY, JSON.stringify(lista)); } catch (e) {}
+  try { localStorage.setItem(getHipotesisKey(), JSON.stringify(lista)); } catch (e) {}
 }
 function renderHipotesisSelect(seleccionar) {
   var lista = cargarHipotesis();
@@ -264,9 +335,9 @@ function guardarNuevaHipotesis() {
   document.getElementById('nuevaHipotesisTexto').value = '';
 }
 renderHipotesisSelect();
-window.addEventListener('storage', function(e){ if (e.key === HIPOTESIS_KEY) renderHipotesisSelect(document.getElementById('hipotesisSelect').value); });
-window.addEventListener('focus', function(){ renderHipotesisSelect(document.getElementById('hipotesisSelect').value); });
-document.addEventListener('visibilitychange', function(){ if (!document.hidden) renderHipotesisSelect(document.getElementById('hipotesisSelect').value); });
+window.addEventListener('storage', function(e){ if (e.key === getHipotesisKey() || e.key === AUDITORIA_KEY) { renderAuditoriaSelector(); renderHipotesisSelect(document.getElementById('hipotesisSelect').value); } });
+window.addEventListener('focus', function(){ renderAuditoriaSelector(); renderHipotesisSelect(document.getElementById('hipotesisSelect').value); });
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); renderHipotesisSelect(document.getElementById('hipotesisSelect').value); } });
 
 function setEfectoHipotesis(v) {
   efectoHipotesis = (efectoHipotesis === v) ? null : v;
@@ -448,6 +519,7 @@ function renderResumen() {
     var raciList = [];
     for (var k in selectedRaci) raciList.push(k);
     var html = '';
+    html += '<div>Auditoría: <strong>' + (obtenerAuditoriaActual() || '(sin seleccionar)') + '</strong></div>';
     html += '<div><strong>' + rutaActual() + '</strong></div>';
     html += '<div>Entrevistado: ' + (document.getElementById('entrevistado').value || '(sin nombre)') + '</div>';
     html += '<div>Cargo / Puesto: ' + (document.getElementById('cargo').value || '(sin registrar)') + ' / ' + (document.getElementById('puesto').value || '(sin registrar)') + '</div>';
@@ -486,6 +558,7 @@ function prepararExportacion() {
   for (var k in selectedRaci) raciList.push(k);
 
   var data = {
+    auditoria: obtenerAuditoriaActual(),
     ruta: rutaActual(),
     entrevistado: document.getElementById('entrevistado').value,
     cargo: document.getElementById('cargo').value,
