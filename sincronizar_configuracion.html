@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECO-T — Sincronizar Configuración</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    background: #FFFFFF;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p.subtitle { font-size: 13px; color: #666; margin: 0 0 20px; }
+  label.field-label { font-size: 11px; color: #999; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.02em; }
+  input, select {
+    font-family: inherit;
+    font-size: 14px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: #fff;
+  }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    width: 100%;
+  }
+  button.primary { background: #1a1a1a; color: #fff; border: none; padding: 13px; font-size: 14px; }
+  .section-label { font-size: 13px; color: #444; margin: 20px 0 8px; font-weight: 600; }
+  .muted { font-size: 11px; color: #999; }
+  .card { background: #f7f7f5; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
+  .resumen-item { display:flex; justify-content:space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #eee; }
+  .ok-box { background:#eaf7ed; color:#2a9d4f; border-radius:8px; padding:12px; margin-top:10px; font-size:13px; display:none; }
+  .warn-box { background:#fdecea; color:#c0392b; border-radius:8px; padding:12px; margin-top:10px; font-size:13px; display:none; }
+</style>
+</head>
+<body>
+
+<h1>Sincronizar Configuración</h1>
+<p class="subtitle">MECO-T Field Workbook — traslada hipótesis, estructura y ponderación entre dispositivos, sin volver a escribir nada.</p>
+
+<div style="background:#f7f7f5; border:1px solid #2a78d6; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
+  <label class="field-label" style="margin-bottom:2px;">Auditoría actual (en este dispositivo)</label>
+  <p style="font-size:14px; font-weight:600; margin:0 0 8px;" id="auditoriaActualDisplay">Sin seleccionar</p>
+  <select id="auditoriaSelect" onchange="onAuditoriaSelectChange()" style="margin:0;"></select>
+  <div id="nuevaAuditoriaBlock" style="display:none; margin-top:8px;">
+    <input id="nuevaAuditoriaTexto" type="text" placeholder="Ej: Minera-Norte-2026">
+    <button type="button" onclick="confirmarNuevaAuditoria()">Usar esta auditoría</button>
+  </div>
+</div>
+
+<div class="card">
+  <p class="section-label" style="margin-top:0;">1. Exportar desde este dispositivo</p>
+  <p class="muted" style="margin:0 0 10px;">Empaqueta todo lo configurado aquí para la auditoría actual — hipótesis, estructura de Gestión/Proceso/Actividad, y las ponderaciones — en un solo archivo.</p>
+  <div id="resumenExport"></div>
+  <button type="button" class="primary" onclick="prepararExportacion()" id="btnPreparar" style="margin-top:10px;">Preparar paquete de configuración</button>
+  <a id="exportLink" href="#" download="config_meco-t.json" style="display:none; text-align:center; padding:13px; margin-top:10px; background:#2a9d4f; color:#fff; border-radius:8px; text-decoration:none; font-size:14px;">Guardar paquete en Archivos</a>
+</div>
+
+<div class="card">
+  <p class="section-label" style="margin-top:0;">2. Importar en este dispositivo</p>
+  <p class="muted" style="margin:0 0 10px;">Selecciona el archivo que exportaste desde el otro dispositivo (AirDrop, Mail, iCloud Drive, etc.). Se cargará en la auditoría seleccionada arriba.</p>
+  <input type="file" id="importInput" accept="application/json,.json" onchange="onImportarArchivo(event)">
+  <div id="importOk" class="ok-box"></div>
+  <div id="importWarn" class="warn-box"></div>
+</div>
+
+<script>
+var AUDITORIA_KEY = 'meco_t_auditoria_actual';
+var AUDITORIAS_LISTA_KEY = 'meco_t_auditorias_conocidas';
+
+function obtenerAuditoriaActual() {
+  try { return localStorage.getItem(AUDITORIA_KEY) || ''; } catch (e) { return ''; }
+}
+function obtenerAuditoriasConocidas() {
+  try {
+    var raw = localStorage.getItem(AUDITORIAS_LISTA_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function guardarAuditoriasConocidas(lista) {
+  try { localStorage.setItem(AUDITORIAS_LISTA_KEY, JSON.stringify(lista)); } catch (e) {}
+}
+function slugAuditoria(nombre) {
+  return (nombre || 'default').trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+}
+function establecerAuditoriaActual(nombre) {
+  try { localStorage.setItem(AUDITORIA_KEY, nombre); } catch (e) {}
+  var lista = obtenerAuditoriasConocidas();
+  if (lista.indexOf(nombre) === -1) { lista.push(nombre); guardarAuditoriasConocidas(lista); }
+}
+function renderAuditoriaSelector() {
+  var actual = obtenerAuditoriaActual();
+  document.getElementById('auditoriaActualDisplay').textContent = actual || 'Sin seleccionar todavía';
+  var conocidas = obtenerAuditoriasConocidas();
+  var sel = document.getElementById('auditoriaSelect');
+  var html = '';
+  if (!actual) html += '<option value="">Elige o crea una auditoría</option>';
+  for (var i=0;i<conocidas.length;i++) {
+    html += '<option value="' + conocidas[i].replace(/"/g,'&quot;') + '">' + conocidas[i] + '</option>';
+  }
+  html += '<option value="__nueva__">+ Nueva auditoría</option>';
+  sel.innerHTML = html;
+  if (actual) sel.value = actual;
+}
+function onAuditoriaSelectChange() {
+  var sel = document.getElementById('auditoriaSelect');
+  if (sel.value === '__nueva__') {
+    document.getElementById('nuevaAuditoriaBlock').style.display = 'block';
+  } else if (sel.value) {
+    document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
+    establecerAuditoriaActual(sel.value);
+    renderAuditoriaSelector();
+    renderResumenExport();
+  }
+}
+function confirmarNuevaAuditoria() {
+  var texto = document.getElementById('nuevaAuditoriaTexto').value.trim();
+  if (!texto) return;
+  establecerAuditoriaActual(texto);
+  document.getElementById('nuevaAuditoriaTexto').value = '';
+  document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
+  renderAuditoriaSelector();
+  renderResumenExport();
+}
+renderAuditoriaSelector();
+
+function getHipotesisKey(aud) { return 'meco_t_hipotesis_v1_' + slugAuditoria(aud); }
+function getAgendaKey(aud) { return 'meco_t_agenda_v1_' + slugAuditoria(aud); }
+function getArbolKey(aud) { return 'meco_t_arbol_aspectos_v1_' + slugAuditoria(aud); }
+function getPesosProcesoKey(aud) { return 'meco_t_pesos_proceso_v1_' + slugAuditoria(aud); }
+function getPesosAspectoKey(aud) { return 'meco_t_pesos_aspecto_v1_' + slugAuditoria(aud); }
+
+function leerJSON(key) {
+  try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+}
+function escribirJSON(key, valor) {
+  try { localStorage.setItem(key, JSON.stringify(valor)); } catch (e) {}
+}
+
+function contarNodos(arbol) {
+  arbol = arbol || {};
+  var gestiones = Object.keys(arbol).length;
+  var procesos = 0, actividades = 0;
+  for (var g in arbol) {
+    var ps = Object.keys(arbol[g]);
+    procesos += ps.length;
+    for (var i=0;i<ps.length;i++) actividades += (arbol[g][ps[i]] || []).length;
+  }
+  return { gestiones: gestiones, procesos: procesos, actividades: actividades };
+}
+
+function renderResumenExport() {
+  var aud = obtenerAuditoriaActual();
+  var el = document.getElementById('resumenExport');
+  if (!aud) { el.innerHTML = '<p class="muted">Selecciona una auditoría arriba primero.</p>'; return; }
+  var hip = leerJSON(getHipotesisKey(aud)) || [];
+  var arbol = leerJSON(getArbolKey(aud)) || {};
+  var pesosP = leerJSON(getPesosProcesoKey(aud)) || {};
+  var pesosA = leerJSON(getPesosAspectoKey(aud)) || {};
+  var conteo = contarNodos(arbol);
+  var html = '';
+  html += '<div class="resumen-item"><span>Hipótesis</span><strong>' + hip.length + '</strong></div>';
+  html += '<div class="resumen-item"><span>Gestiones</span><strong>' + conteo.gestiones + '</strong></div>';
+  html += '<div class="resumen-item"><span>Procesos</span><strong>' + conteo.procesos + '</strong></div>';
+  html += '<div class="resumen-item"><span>Actividades</span><strong>' + conteo.actividades + '</strong></div>';
+  html += '<div class="resumen-item"><span>Pesos de Procesos guardados</span><strong>' + Object.keys(pesosP).length + '</strong></div>';
+  html += '<div class="resumen-item"><span>Pesos de Actividades guardados</span><strong>' + Object.keys(pesosA).length + '</strong></div>';
+  el.innerHTML = html;
+}
+renderResumenExport();
+
+function prepararExportacion() {
+  var aud = obtenerAuditoriaActual();
+  if (!aud) { alert('Selecciona una auditoría primero.'); return; }
+  var paquete = {
+    tipo: 'meco_t_config_paquete',
+    version: 1,
+    auditoria: aud,
+    fecha_exportacion: new Date().toISOString(),
+    hipotesis: leerJSON(getHipotesisKey(aud)) || [],
+    agenda: leerJSON(getAgendaKey(aud)) || [],
+    arbol: leerJSON(getArbolKey(aud)) || {},
+    pesos_proceso: leerJSON(getPesosProcesoKey(aud)) || {},
+    pesos_aspecto: leerJSON(getPesosAspectoKey(aud)) || {}
+  };
+  var blob = new Blob([JSON.stringify(paquete, null, 2)], {type: 'application/json'});
+  var url = URL.createObjectURL(blob);
+  var link = document.getElementById('exportLink');
+  link.href = url;
+  link.download = 'config_' + slugAuditoria(aud) + '_meco-t.json';
+  link.style.display = 'block';
+  document.getElementById('btnPreparar').style.display = 'none';
+}
+
+function onImportarArchivo(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var okBox = document.getElementById('importOk');
+  var warnBox = document.getElementById('importWarn');
+  okBox.style.display = 'none';
+  warnBox.style.display = 'none';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var paquete;
+    try {
+      paquete = JSON.parse(e.target.result);
+    } catch (err) {
+      warnBox.style.display = 'block';
+      warnBox.textContent = 'Este archivo no es un JSON válido. Verifica que sea el archivo correcto.';
+      return;
+    }
+    if (!paquete || paquete.tipo !== 'meco_t_config_paquete') {
+      warnBox.style.display = 'block';
+      warnBox.textContent = 'Este archivo no parece ser un paquete de configuración de MECO-T (falta la marca de identificación).';
+      return;
+    }
+    var audDestino = obtenerAuditoriaActual();
+    if (!audDestino) {
+      warnBox.style.display = 'block';
+      warnBox.textContent = 'Selecciona o crea primero la auditoría de destino, arriba.';
+      return;
+    }
+
+    escribirJSON(getHipotesisKey(audDestino), paquete.hipotesis || []);
+    escribirJSON(getAgendaKey(audDestino), paquete.agenda || []);
+    escribirJSON(getArbolKey(audDestino), paquete.arbol || {});
+    escribirJSON(getPesosProcesoKey(audDestino), paquete.pesos_proceso || {});
+    escribirJSON(getPesosAspectoKey(audDestino), paquete.pesos_aspecto || {});
+
+    var conteo = contarNodos(paquete.arbol || {});
+    okBox.style.display = 'block';
+    okBox.innerHTML = 'Importado correctamente en "' + audDestino + '":<br>' +
+      (paquete.hipotesis||[]).length + ' hipótesis · ' +
+      conteo.gestiones + ' Gestión(es) · ' +
+      conteo.procesos + ' Proceso(s) · ' +
+      conteo.actividades + ' Actividad(es)' +
+      (paquete.auditoria !== audDestino ? '<br><br>Nota: el archivo fue exportado desde la auditoría "' + paquete.auditoria + '" y se cargó dentro de "' + audDestino + '" en este dispositivo.' : '');
+
+    renderResumenExport();
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+window.addEventListener('focus', function(){ renderAuditoriaSelector(); renderResumenExport(); });
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); renderResumenExport(); } });
+</script>
+</body>
+</html>
