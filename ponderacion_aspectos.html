@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECO-T — Ponderación de Procesos y Actividades</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    background: #FFFFFF;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p.subtitle { font-size: 13px; color: #666; margin: 0 0 20px; }
+  label.field-label { font-size: 11px; color: #999; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.02em; }
+  input, select, textarea {
+    font-family: inherit;
+    font-size: 14px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 50px; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 9px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .section-label { font-size: 13px; color: #444; margin: 20px 0 8px; font-weight: 600; }
+  .muted { font-size: 11px; color: #999; }
+  .card { background: #f7f7f5; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .card-title { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .total-bar { border-radius: 10px; padding: 12px 14px; margin-bottom: 16px; text-align: center; }
+  .total-bar .num { font-size: 22px; font-weight: 600; }
+  .total-ok { background: #eaf7ed; color: #2a9d4f; }
+  .total-warn { background: #fdecea; color: #c0392b; }
+</style>
+</head>
+<body>
+
+<h1>Ponderación de Procesos y Actividades</h1>
+<p class="subtitle">MECO-T Field Workbook — herramienta independiente, funciona sin conexión</p>
+
+<div style="background:#f7f7f5; border:1px solid #2a78d6; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
+  <label class="field-label" style="margin-bottom:2px;">Auditoría actual</label>
+  <p style="font-size:14px; font-weight:600; margin:0 0 8px;" id="auditoriaActualDisplay">Sin seleccionar</p>
+  <select id="auditoriaSelect" onchange="onAuditoriaSelectChange()" style="margin:0;"></select>
+  <div id="nuevaAuditoriaBlock" style="display:none; margin-top:8px;">
+    <input id="nuevaAuditoriaTexto" type="text" placeholder="Ej: Minera-Norte-2026">
+    <button type="button" onclick="confirmarNuevaAuditoria()" style="width:100%;">Usar esta auditoría</button>
+  </div>
+  <p class="muted" style="margin:8px 0 0;">La estructura de Gestión/Proceso/Actividad se define en "Configuración de Gestión Auditada" — aquí solo se pondera lo que ya existe.</p>
+</div>
+
+<p id="breadcrumb" class="muted" style="margin:0 0 8px; font-size:13px;"></p>
+<div id="nivelHeader" style="margin-bottom:12px;"></div>
+<div id="totalBar" style="display:none;" class="total-bar"></div>
+
+<div id="listaNivel"></div>
+<p class="muted" id="listaVacia" style="display:none;"></p>
+
+<script>
+var AUDITORIA_KEY = 'meco_t_auditoria_actual';
+var AUDITORIAS_LISTA_KEY = 'meco_t_auditorias_conocidas';
+
+function obtenerAuditoriaActual() {
+  try { return localStorage.getItem(AUDITORIA_KEY) || ''; } catch (e) { return ''; }
+}
+function obtenerAuditoriasConocidas() {
+  try {
+    var raw = localStorage.getItem(AUDITORIAS_LISTA_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) { return []; }
+}
+function guardarAuditoriasConocidas(lista) {
+  try { localStorage.setItem(AUDITORIAS_LISTA_KEY, JSON.stringify(lista)); } catch (e) {}
+}
+function slugAuditoria(nombre) {
+  return (nombre || 'default').trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+}
+function establecerAuditoriaActual(nombre) {
+  try { localStorage.setItem(AUDITORIA_KEY, nombre); } catch (e) {}
+  var lista = obtenerAuditoriasConocidas();
+  if (lista.indexOf(nombre) === -1) { lista.push(nombre); guardarAuditoriasConocidas(lista); }
+}
+function renderAuditoriaSelector() {
+  var actual = obtenerAuditoriaActual();
+  document.getElementById('auditoriaActualDisplay').textContent = actual || 'Sin seleccionar todavía';
+  var conocidas = obtenerAuditoriasConocidas();
+  var sel = document.getElementById('auditoriaSelect');
+  var html = '';
+  if (!actual) html += '<option value="">Elige o crea una auditoría</option>';
+  for (var i=0;i<conocidas.length;i++) {
+    html += '<option value="' + conocidas[i].replace(/"/g,'&quot;') + '">' + conocidas[i] + '</option>';
+  }
+  html += '<option value="__nueva__">+ Nueva auditoría</option>';
+  sel.innerHTML = html;
+  if (actual) sel.value = actual;
+}
+function onAuditoriaSelectChange() {
+  var sel = document.getElementById('auditoriaSelect');
+  if (sel.value === '__nueva__') {
+    document.getElementById('nuevaAuditoriaBlock').style.display = 'block';
+  } else if (sel.value) {
+    document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
+    establecerAuditoriaActual(sel.value);
+    renderAuditoriaSelector();
+    nivelActual = 'gestiones'; gestionActiva = null; procesoActivo = null;
+    render();
+  }
+}
+function confirmarNuevaAuditoria() {
+  var texto = document.getElementById('nuevaAuditoriaTexto').value.trim();
+  if (!texto) return;
+  establecerAuditoriaActual(texto);
+  document.getElementById('nuevaAuditoriaTexto').value = '';
+  document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
+  renderAuditoriaSelector();
+  nivelActual = 'gestiones'; gestionActiva = null; procesoActivo = null;
+  render();
+}
+renderAuditoriaSelector();
+
+function getArbolKey() { return 'meco_t_arbol_aspectos_v1_' + slugAuditoria(obtenerAuditoriaActual()); }
+function cargarArbol() {
+  try { var raw = localStorage.getItem(getArbolKey()); return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; }
+}
+function getPesosProcesoKey() { return 'meco_t_pesos_proceso_v1_' + slugAuditoria(obtenerAuditoriaActual()); }
+function getPesosAspectoKey() { return 'meco_t_pesos_aspecto_v1_' + slugAuditoria(obtenerAuditoriaActual()); }
+function cargarPesosProceso() {
+  try { var raw = localStorage.getItem(getPesosProcesoKey()); return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; }
+}
+function guardarPesosProceso(datos) {
+  try { localStorage.setItem(getPesosProcesoKey(), JSON.stringify(datos)); } catch (e) {}
+}
+function cargarPesosAspecto() {
+  try { var raw = localStorage.getItem(getPesosAspectoKey()); return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; }
+}
+function guardarPesosAspecto(datos) {
+  try { localStorage.setItem(getPesosAspectoKey(), JSON.stringify(datos)); } catch (e) {}
+}
+function claveProceso(g, p) { return g + '::' + p; }
+function claveAspecto(g, p, a) { return g + '::' + p + '::' + a; }
+
+var nivelActual = 'gestiones';
+var gestionActiva = null;
+var procesoActivo = null;
+
+function irANivel(nivel, g, p) {
+  nivelActual = nivel;
+  gestionActiva = g || null;
+  procesoActivo = p || null;
+  render();
+}
+
+function actualizarPesoProceso(g, p, valor) {
+  var pesos = cargarPesosProceso();
+  var k = claveProceso(g, p);
+  if (!pesos[k]) pesos[k] = { peso: 0, justificacion: '' };
+  pesos[k].peso = Number(valor) || 0;
+  guardarPesosProceso(pesos);
+  actualizarTotalProcesos();
+}
+function actualizarJustifProceso(g, p, valor) {
+  var pesos = cargarPesosProceso();
+  var k = claveProceso(g, p);
+  if (!pesos[k]) pesos[k] = { peso: 0, justificacion: '' };
+  pesos[k].justificacion = valor;
+  guardarPesosProceso(pesos);
+}
+function actualizarPesoAspecto(g, p, a, valor) {
+  var pesos = cargarPesosAspecto();
+  var k = claveAspecto(g, p, a);
+  if (!pesos[k]) pesos[k] = { peso: 0, justificacion: '' };
+  pesos[k].peso = Number(valor) || 0;
+  guardarPesosAspecto(pesos);
+  actualizarTotalAspectos();
+}
+function actualizarJustifAspecto(g, p, a, valor) {
+  var pesos = cargarPesosAspecto();
+  var k = claveAspecto(g, p, a);
+  if (!pesos[k]) pesos[k] = { peso: 0, justificacion: '' };
+  pesos[k].justificacion = valor;
+  guardarPesosAspecto(pesos);
+}
+
+function actualizarTotalProcesos() {
+  var arbol = cargarArbol();
+  var pesos = cargarPesosProceso();
+  var procesos = Object.keys(arbol[gestionActiva] || {});
+  var total = 0;
+  for (var i=0;i<procesos.length;i++) {
+    var k = claveProceso(gestionActiva, procesos[i]);
+    total += (pesos[k] ? pesos[k].peso : 0);
+  }
+  pintarTotal(total);
+}
+function actualizarTotalAspectos() {
+  var arbol = cargarArbol();
+  var pesos = cargarPesosAspecto();
+  var aspectos = (arbol[gestionActiva] && arbol[gestionActiva][procesoActivo]) ? arbol[gestionActiva][procesoActivo] : [];
+  var total = 0;
+  for (var i=0;i<aspectos.length;i++) {
+    var k = claveAspecto(gestionActiva, procesoActivo, aspectos[i]);
+    total += (pesos[k] ? pesos[k].peso : 0);
+  }
+  pintarTotal(total);
+}
+function pintarTotal(total) {
+  var bar = document.getElementById('totalBar');
+  bar.style.display = 'block';
+  bar.className = 'total-bar ' + (total === 100 ? 'total-ok' : 'total-warn');
+  bar.innerHTML = '<div class="num">' + total + '%</div><div>' + (total === 100 ? 'Suma correcta' : 'Debe sumar 100% — revisa los pesos') + '</div>';
+}
+
+function render() {
+  var arbol = cargarArbol();
+  var breadcrumb = document.getElementById('breadcrumb');
+  var header = document.getElementById('nivelHeader');
+  var listaEl = document.getElementById('listaNivel');
+  var vacioEl = document.getElementById('listaVacia');
+  var totalBar = document.getElementById('totalBar');
+  header.innerHTML = '';
+  listaEl.innerHTML = '';
+  totalBar.style.display = 'none';
+
+  if (nivelActual === 'gestiones') {
+    breadcrumb.textContent = '';
+    var gestiones = Object.keys(arbol);
+    if (gestiones.length === 0) {
+      vacioEl.style.display = 'block';
+      vacioEl.textContent = 'No hay ninguna Gestión configurada todavía. Ve primero a "Configuración de Gestión Auditada".';
+      return;
+    }
+    vacioEl.style.display = 'none';
+    for (var i=0;i<gestiones.length;i++) {
+      (function(g){
+        var card = document.createElement('div');
+        card.className = 'card';
+        var procesos = Object.keys(arbol[g]);
+        card.innerHTML = '<p class="card-title">' + g + '</p><p class="muted" style="margin:0 0 8px;">' + procesos.length + ' proceso(s)</p>';
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'Ponderar Procesos de esta Gestión';
+        btn.style.width = '100%';
+        btn.onclick = function(){ irANivel('procesos', g); };
+        card.appendChild(btn);
+        listaEl.appendChild(card);
+      })(gestiones[i]);
+    }
+
+  } else if (nivelActual === 'procesos') {
+    breadcrumb.innerHTML = '<span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'gestiones\')">‹ Todas las Gestiones</span>';
+    header.innerHTML = '<p style="font-size:15px; font-weight:600; margin:0;">Ponderando Procesos de: ' + gestionActiva + '</p>';
+
+    var procesos = Object.keys(arbol[gestionActiva] || {});
+    if (procesos.length === 0) {
+      vacioEl.style.display = 'block';
+      vacioEl.textContent = 'Esta Gestión no tiene Procesos configurados todavía.';
+      return;
+    }
+    vacioEl.style.display = 'none';
+    var pesosProc = cargarPesosProceso();
+    for (var j=0;j<procesos.length;j++) {
+      (function(p){
+        var k = claveProceso(gestionActiva, p);
+        var datos = pesosProc[k] || { peso: 0, justificacion: '' };
+        var card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = '<p class="card-title">' + p + '</p>';
+
+        var row = document.createElement('div');
+        row.className = 'row2';
+        var pesoWrap = document.createElement('div');
+        pesoWrap.innerHTML = '<label class="field-label">Peso (%)</label>';
+        var pesoInput = document.createElement('input');
+        pesoInput.type = 'number';
+        pesoInput.min = '0'; pesoInput.max = '100';
+        pesoInput.value = datos.peso;
+        pesoInput.oninput = function(){ actualizarPesoProceso(gestionActiva, p, pesoInput.value); };
+        pesoWrap.appendChild(pesoInput);
+        var entrarWrap = document.createElement('div');
+        entrarWrap.innerHTML = '<label class="field-label">Actividades de este Proceso</label>';
+        var entrarBtn = document.createElement('button');
+        entrarBtn.type = 'button';
+        entrarBtn.textContent = 'Ponderar Actividades';
+        entrarBtn.style.width = '100%';
+        entrarBtn.onclick = function(){ irANivel('aspectos', gestionActiva, p); };
+        entrarWrap.appendChild(entrarBtn);
+        row.appendChild(pesoWrap);
+        row.appendChild(entrarWrap);
+        card.appendChild(row);
+
+        var justifLabel = document.createElement('label');
+        justifLabel.className = 'field-label';
+        justifLabel.textContent = 'Justificación de este peso';
+        card.appendChild(justifLabel);
+        var justifInput = document.createElement('textarea');
+        justifInput.placeholder = '¿Por qué este Proceso pesa lo que pesa, frente a los demás de esta Gestión?';
+        justifInput.value = datos.justificacion;
+        justifInput.oninput = function(){ actualizarJustifProceso(gestionActiva, p, justifInput.value); };
+        card.appendChild(justifInput);
+
+        listaEl.appendChild(card);
+      })(procesos[j]);
+    }
+    actualizarTotalProcesos();
+
+  } else if (nivelActual === 'aspectos') {
+    breadcrumb.innerHTML = '<span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'gestiones\')">‹ Todas las Gestiones</span> &nbsp;/&nbsp; <span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'procesos\', \'' + gestionActiva.replace(/'/g,"\\'") + '\')">' + gestionActiva + '</span>';
+    header.innerHTML = '<p style="font-size:15px; font-weight:600; margin:0;">Ponderando Actividades de:<br>' + gestionActiva + ' › ' + procesoActivo + '</p>';
+
+    var aspectos = (arbol[gestionActiva] && arbol[gestionActiva][procesoActivo]) ? arbol[gestionActiva][procesoActivo] : [];
+    if (aspectos.length === 0) {
+      vacioEl.style.display = 'block';
+      vacioEl.textContent = 'Este Proceso no tiene Actividades configuradas todavía.';
+      return;
+    }
+    vacioEl.style.display = 'none';
+    var pesosAsp = cargarPesosAspecto();
+    for (var k2=0;k2<aspectos.length;k2++) {
+      (function(a){
+        var k = claveAspecto(gestionActiva, procesoActivo, a);
+        var datos = pesosAsp[k] || { peso: 0, justificacion: '' };
+        var card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = '<p class="card-title">' + a + '</p>';
+
+        var pesoLabel = document.createElement('label');
+        pesoLabel.className = 'field-label';
+        pesoLabel.textContent = 'Peso (%)';
+        card.appendChild(pesoLabel);
+        var pesoInput = document.createElement('input');
+        pesoInput.type = 'number';
+        pesoInput.min = '0'; pesoInput.max = '100';
+        pesoInput.value = datos.peso;
+        pesoInput.oninput = function(){ actualizarPesoAspecto(gestionActiva, procesoActivo, a, pesoInput.value); };
+        card.appendChild(pesoInput);
+
+        var justifLabel = document.createElement('label');
+        justifLabel.className = 'field-label';
+        justifLabel.textContent = 'Justificación de este peso';
+        card.appendChild(justifLabel);
+        var justifInput = document.createElement('textarea');
+        justifInput.placeholder = '¿Por qué esta Actividad pesa lo que pesa, frente a las demás de este Proceso?';
+        justifInput.value = datos.justificacion;
+        justifInput.oninput = function(){ actualizarJustifAspecto(gestionActiva, procesoActivo, a, justifInput.value); };
+        card.appendChild(justifInput);
+
+        listaEl.appendChild(card);
+      })(aspectos[k2]);
+    }
+    actualizarTotalAspectos();
+  }
+}
+render();
+
+window.addEventListener('focus', function(){ renderAuditoriaSelector(); render(); });
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); render(); } });
+</script>
+</body>
+</html>
