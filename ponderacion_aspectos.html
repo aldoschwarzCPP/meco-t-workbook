@@ -370,5 +370,14 @@ render();
 window.addEventListener('focus', function(){ renderAuditoriaSelector(); render(); });
 document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); render(); } });
 </script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(err) {
+      console.log('No se pudo activar el uso sin conexión:', err);
+    });
+  });
+}
+</script>
 </body>
 </html>
