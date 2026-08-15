@@ -59,6 +59,11 @@
     <input id="nuevaAuditoriaTexto" type="text" placeholder="Ej: Minera-Norte-2026">
     <button type="button" onclick="confirmarNuevaAuditoria()">Usar esta auditoría</button>
   </div>
+  <button type="button" onclick="mostrarRenombrar()" id="btnMostrarRenombrar" style="margin-top:8px;">Renombrar esta auditoría</button>
+  <div id="renombrarBlock" style="display:none; margin-top:8px;">
+    <input id="renombrarTexto" type="text" placeholder="Nuevo nombre para esta auditoría">
+    <button type="button" onclick="confirmarRenombrar()" style="background:#1a1a1a; color:#fff; border:none;">Guardar nuevo nombre</button>
+  </div>
 </div>
 
 <div class="card">
@@ -134,6 +139,63 @@ function confirmarNuevaAuditoria() {
   document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
   renderAuditoriaSelector();
   renderResumenExport();
+}
+
+function mostrarRenombrar() {
+  var actual = obtenerAuditoriaActual();
+  if (!actual) { alert('Selecciona una auditoría primero.'); return; }
+  document.getElementById('renombrarTexto').value = actual;
+  document.getElementById('renombrarBlock').style.display = 'block';
+}
+
+function confirmarRenombrar() {
+  var nombreViejo = obtenerAuditoriaActual();
+  var nombreNuevo = document.getElementById('renombrarTexto').value.trim();
+  if (!nombreNuevo || nombreNuevo === nombreViejo) {
+    document.getElementById('renombrarBlock').style.display = 'none';
+    return;
+  }
+  var conocidas = obtenerAuditoriasConocidas();
+  if (conocidas.indexOf(nombreNuevo) !== -1) {
+    alert('Ya existe una auditoría con ese nombre. Elige un nombre distinto.');
+    return;
+  }
+  if (!confirm('¿Renombrar "' + nombreViejo + '" a "' + nombreNuevo + '"? Toda su información (hipótesis, estructura, ponderaciones) se traslada al nuevo nombre.')) {
+    return;
+  }
+
+  // Migrar cada tipo de dato de la clave vieja a la clave nueva
+  var hip = leerJSON(getHipotesisKey(nombreViejo));
+  var age = leerJSON(getAgendaKey(nombreViejo));
+  var arb = leerJSON(getArbolKey(nombreViejo));
+  var pp = leerJSON(getPesosProcesoKey(nombreViejo));
+  var pa = leerJSON(getPesosAspectoKey(nombreViejo));
+
+  if (hip !== null) escribirJSON(getHipotesisKey(nombreNuevo), hip);
+  if (age !== null) escribirJSON(getAgendaKey(nombreNuevo), age);
+  if (arb !== null) escribirJSON(getArbolKey(nombreNuevo), arb);
+  if (pp !== null) escribirJSON(getPesosProcesoKey(nombreNuevo), pp);
+  if (pa !== null) escribirJSON(getPesosAspectoKey(nombreNuevo), pa);
+
+  try { localStorage.removeItem(getHipotesisKey(nombreViejo)); } catch(e) {}
+  try { localStorage.removeItem(getAgendaKey(nombreViejo)); } catch(e) {}
+  try { localStorage.removeItem(getArbolKey(nombreViejo)); } catch(e) {}
+  try { localStorage.removeItem(getPesosProcesoKey(nombreViejo)); } catch(e) {}
+  try { localStorage.removeItem(getPesosAspectoKey(nombreViejo)); } catch(e) {}
+
+  // Actualizar la lista de auditorías conocidas: quitar el nombre viejo, agregar el nuevo
+  var idx = conocidas.indexOf(nombreViejo);
+  if (idx !== -1) conocidas.splice(idx, 1);
+  conocidas.push(nombreNuevo);
+  guardarAuditoriasConocidas(conocidas);
+
+  // Establecer el nuevo nombre como auditoría actual
+  try { localStorage.setItem(AUDITORIA_KEY, nombreNuevo); } catch(e) {}
+
+  document.getElementById('renombrarBlock').style.display = 'none';
+  renderAuditoriaSelector();
+  renderResumenExport();
+  alert('Renombrado correctamente a "' + nombreNuevo + '".');
 }
 renderAuditoriaSelector();
 
@@ -258,6 +320,15 @@ function onImportarArchivo(event) {
 
 window.addEventListener('focus', function(){ renderAuditoriaSelector(); renderResumenExport(); });
 document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); renderResumenExport(); } });
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(err) {
+      console.log('No se pudo activar el uso sin conexión:', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
