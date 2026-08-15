@@ -440,15 +440,18 @@ function saveNodo() {
   if (!nombre) return;
   var padreId = Number(document.getElementById('padreNodo').value);
   var linea = matricial ? document.getElementById('lineaMando').value : null;
+  var nuevoId;
   if (editingId !== null) {
     var n = null;
     for (var i=0;i<nodos.length;i++) { if (nodos[i].id===editingId) n = nodos[i]; }
     n.n = nombre; n.padre = padreId; n.linea = linea;
+    nuevoId = editingId;
   } else {
-    nodos.push({id: nodos.length, n: nombre, padre: padreId, linea: linea});
+    nuevoId = nodos.length;
+    nodos.push({id: nuevoId, n: nombre, padre: padreId, linea: linea, personas: []});
   }
-  cancelEdit();
   drawNodos();
+  startEdit(nuevoId);
 }
 function deleteNodo() {
   var tieneHijos = false;
@@ -515,6 +518,15 @@ function exportData() {
 setMatricial(false);
 setRegimen(false);
 drawNodos();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(err) {
+      console.log('No se pudo activar el uso sin conexión:', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
