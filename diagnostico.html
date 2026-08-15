@@ -42,7 +42,10 @@
     white-space: pre-wrap;
     word-break: break-word;
   }
-  .hip-row { padding: 8px 0; border-bottom: 1px solid #eee; font-size: 13px; }
+  .aud-block { background: #f7f7f5; border-radius: 10px; padding: 12px; margin-bottom: 10px; border: 1px solid #e5e5e3; }
+  .aud-block.actual { border-color: #2a78d6; border-width: 2px; }
+  .aud-title { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+  .aud-row { display:flex; justify-content:space-between; padding: 4px 0; font-size: 12.5px; border-top: 1px solid #eee; }
   .warn { background: #fdecea; color: #c0392b; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
   .ok { background: #eaf7ed; color: #2a9d4f; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; }
 </style>
@@ -50,70 +53,118 @@
 <body>
 
 <h1>Diagnóstico del Workbook</h1>
-<p class="subtitle">Muestra exactamente qué hay guardado ahora mismo, sin interpretaciones — para verificar la sincronización real entre herramientas.</p>
+<p class="subtitle">Muestra exactamente qué hay guardado ahora mismo en ESTE navegador — para verificar dudas de sincronización sin adivinar.</p>
 
 <div class="card">
-  <p class="lbl">Origen (debe ser el mismo en las tres herramientas)</p>
+  <p class="lbl">Origen (debe ser aldoschwarzcpp.github.io)</p>
   <p class="val" id="origenActual" style="font-size:13px;"></p>
 </div>
 
 <div id="alertaVersion"></div>
 
-<p class="section-label" style="margin-top:0;">Hipótesis guardadas ahora mismo</p>
-<p class="muted" style="margin:0 0 10px;">Esta es la lista real, leída directamente — si algo no aparece aquí, no está guardado, sin importar qué muestre otra pantalla.</p>
-<div id="hipotesisList"></div>
-<p class="muted" id="sinHipotesis" style="display:none;">No hay ninguna hipótesis guardada en este navegador ahora mismo.</p>
+<div class="card">
+  <p class="lbl">Auditoría actual seleccionada en este navegador</p>
+  <p class="val" id="auditoriaActualVal"></p>
+</div>
 
-<p class="section-label">Datos crudos (JSON)</p>
+<p class="section-label" style="margin-top:0;">Auditorías conocidas en este navegador<span id="contadorAud"></span></p>
+<p class="muted" style="margin:0 0 10px;">Si una auditoría que crees que existe no aparece aquí, es que este navegador específico nunca la creó — sin importar qué muestre otro dispositivo o navegador.</p>
+<div id="auditoriasList"></div>
+<p class="muted" id="sinAuditorias" style="display:none;">No hay ninguna auditoría creada en este navegador todavía.</p>
+
+<p class="section-label">Datos crudos completos (JSON)</p>
 <pre id="rawData"></pre>
 
 <button type="button" onclick="location.reload()">Actualizar diagnóstico</button>
-<button type="button" onclick="copiarDiagnostico()" id="btnCopiar">Copiar diagnóstico completo</button>
+<button type="button" onclick="copiarDiagnostico()">Copiar diagnóstico completo</button>
 <p class="muted" id="copiadoMsg" style="display:none; color:#2a9d4f;">Copiado — puedes pegarlo en un mensaje.</p>
 
 <script>
-var HIPOTESIS_KEY = 'meco_t_hipotesis_v1';
+var AUDITORIA_KEY = 'meco_t_auditoria_actual';
+var AUDITORIAS_LISTA_KEY = 'meco_t_auditorias_conocidas';
 
 document.getElementById('origenActual').textContent = location.protocol + '//' + location.host;
 
-function cargarHipotesis() {
-  try {
-    var raw = localStorage.getItem(HIPOTESIS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (e) { return []; }
+function slugAuditoria(nombre) {
+  return (nombre || 'default').trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+}
+function leerJSON(key) {
+  try { var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+}
+function obtenerAuditoriaActual() {
+  try { return localStorage.getItem(AUDITORIA_KEY) || ''; } catch (e) { return ''; }
+}
+function obtenerAuditoriasConocidas() {
+  var lista = leerJSON(AUDITORIAS_LISTA_KEY);
+  return lista || [];
+}
+function getHipotesisKey(aud) { return 'meco_t_hipotesis_v1_' + slugAuditoria(aud); }
+function getArbolKey(aud) { return 'meco_t_arbol_aspectos_v1_' + slugAuditoria(aud); }
+function getPesosProcesoKey(aud) { return 'meco_t_pesos_proceso_v1_' + slugAuditoria(aud); }
+function getPesosAspectoKey(aud) { return 'meco_t_pesos_aspecto_v1_' + slugAuditoria(aud); }
+
+function contarNodos(arbol) {
+  arbol = arbol || {};
+  var gestiones = Object.keys(arbol).length;
+  var procesos = 0, actividades = 0;
+  for (var g in arbol) {
+    var ps = Object.keys(arbol[g]);
+    procesos += ps.length;
+    for (var i=0;i<ps.length;i++) actividades += (arbol[g][ps[i]] || []).length;
+  }
+  return { gestiones: gestiones, procesos: procesos, actividades: actividades };
 }
 
-var lista = cargarHipotesis();
-var el = document.getElementById('hipotesisList');
-var vacio = document.getElementById('sinHipotesis');
-if (lista.length === 0) {
+var auditoriaActual = obtenerAuditoriaActual();
+document.getElementById('auditoriaActualVal').textContent = auditoriaActual || 'Ninguna seleccionada';
+
+var conocidas = obtenerAuditoriasConocidas();
+document.getElementById('contadorAud').textContent = ' (' + conocidas.length + ')';
+
+var rawCompleto = { origen: location.protocol + '//' + location.host, auditoria_actual: auditoriaActual, auditorias: {} };
+
+var el = document.getElementById('auditoriasList');
+var vacio = document.getElementById('sinAuditorias');
+if (conocidas.length === 0) {
   vacio.style.display = 'block';
 } else {
   vacio.style.display = 'none';
-  var html = '';
-  for (var i=0;i<lista.length;i++) {
-    html += '<div class="hip-row">' + (i+1) + '. ' + lista[i] + '</div>';
+  for (var i=0;i<conocidas.length;i++) {
+    (function(aud){
+      var hip = leerJSON(getHipotesisKey(aud)) || [];
+      var arb = leerJSON(getArbolKey(aud)) || {};
+      var pp = leerJSON(getPesosProcesoKey(aud)) || {};
+      var pa = leerJSON(getPesosAspectoKey(aud)) || {};
+      var conteo = contarNodos(arb);
+
+      rawCompleto.auditorias[aud] = { hipotesis: hip, arbol: arb, pesos_proceso: pp, pesos_aspecto: pa };
+
+      var block = document.createElement('div');
+      block.className = 'aud-block' + (aud === auditoriaActual ? ' actual' : '');
+      var html = '<p class="aud-title">' + aud + (aud === auditoriaActual ? ' — ACTUAL' : '') + '</p>';
+      html += '<div class="aud-row"><span>Hipótesis</span><strong>' + hip.length + '</strong></div>';
+      html += '<div class="aud-row"><span>Gestiones</span><strong>' + conteo.gestiones + '</strong></div>';
+      html += '<div class="aud-row"><span>Procesos</span><strong>' + conteo.procesos + '</strong></div>';
+      html += '<div class="aud-row"><span>Actividades</span><strong>' + conteo.actividades + '</strong></div>';
+      block.innerHTML = html;
+      el.appendChild(block);
+    })(conocidas[i]);
   }
-  el.innerHTML = html;
 }
 
-document.getElementById('rawData').textContent = JSON.stringify(lista, null, 2);
+document.getElementById('rawData').textContent = JSON.stringify(rawCompleto, null, 2);
 
 var alertaEl = document.getElementById('alertaVersion');
 if (location.protocol === 'file:') {
-  alertaEl.innerHTML = '<div class="warn">Estás abriendo este archivo como archivo local (file://), no desde la dirección web real. Los datos que veas aquí NO son los mismos que usan las otras herramientas si esas las abriste desde aldoschwarzcpp.github.io. Cierra esto y ábrelo desde la dirección web real.</div>';
+  alertaEl.innerHTML = '<div class="warn">Estás abriendo este archivo como archivo local (file://), no desde la dirección web real. Ciérralo y ábrelo desde aldoschwarzcpp.github.io/meco-t-workbook/diagnostico.html</div>';
 } else if (location.host.indexOf('github.io') === -1) {
-  alertaEl.innerHTML = '<div class="warn">La dirección actual no es aldoschwarzcpp.github.io — si las otras herramientas SÍ están en esa dirección, esta página no comparte los mismos datos.</div>';
+  alertaEl.innerHTML = '<div class="warn">La dirección actual no es aldoschwarzcpp.github.io — este navegador no comparte datos con las herramientas que sí están en esa dirección.</div>';
 } else {
-  alertaEl.innerHTML = '<div class="ok">Origen correcto — si las otras herramientas también se abrieron desde aldoschwarzcpp.github.io en este mismo navegador, deberían compartir exactamente esta lista.</div>';
+  alertaEl.innerHTML = '<div class="ok">Origen correcto. Lo que ves abajo es exactamente lo que este navegador tiene guardado — si algo no aparece, no está aquí, sin importar qué muestre otro dispositivo.</div>';
 }
 
 function copiarDiagnostico() {
-  var texto = 'DIAGNÓSTICO MECO-T\n';
-  texto += 'Fecha: ' + new Date().toString() + '\n';
-  texto += 'Origen: ' + location.protocol + '//' + location.host + '\n';
-  texto += 'Total hipótesis: ' + lista.length + '\n\n';
-  texto += JSON.stringify(lista, null, 2);
+  var texto = 'DIAGNÓSTICO MECO-T — ' + new Date().toString() + '\n\n' + JSON.stringify(rawCompleto, null, 2);
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(texto).then(function(){
       document.getElementById('copiadoMsg').style.display = 'block';
