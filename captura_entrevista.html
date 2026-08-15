@@ -112,10 +112,10 @@
   <select id="gestion" onchange="onGestionChange()"></select>
   <label class="field-label">Proceso auditado</label>
   <select id="proceso" onchange="onProcesoChange()"></select>
-  <label class="field-label">Aspecto evaluado</label>
+  <label class="field-label">Actividad evaluada</label>
   <select id="aspecto"></select>
 
-  <label class="field-label">Rol RACI del entrevistado en este Aspecto (puede marcar más de uno)</label>
+  <label class="field-label">Rol RACI del entrevistado en esta Actividad (puede marcar más de uno)</label>
   <div class="tag-row" id="raciTags"></div>
   <p id="raciWarning" class="muted badge-warn" style="display:none; margin:-6px 0 10px;">Marcó los 4 roles — quedará registrado así; el audio conserva el detalle completo.</p>
 
@@ -595,6 +595,15 @@ function prepararExportacion() {
   link.download = prefijoArchivo() + '_expediente_entrevista_meco-t.json';
   link.style.display = 'block';
   document.getElementById('btnPrepararExport').style.display = 'none';
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(err) {
+      console.log('No se pudo activar el uso sin conexión:', err);
+    });
+  });
 }
 </script>
 </body>
