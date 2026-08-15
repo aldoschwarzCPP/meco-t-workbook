@@ -206,7 +206,7 @@ function eliminarGestion(g) {
   render();
 }
 function eliminarProceso(g, p) {
-  if (!confirm('¿Eliminar el Proceso "' + p + '" y sus Aspectos?')) return;
+  if (!confirm('¿Eliminar el Proceso "' + p + '" y sus Actividades?')) return;
   var arbol = cargarArbol();
   if (arbol[g]) delete arbol[g][p];
   guardarArbol(arbol);
@@ -250,7 +250,7 @@ function editarProceso(g, p) {
 function editarAspecto(g, p, idx) {
   var arbol = cargarArbol();
   var actual = arbol[g][p][idx];
-  var nuevo = prompt('Editar Aspecto:', actual);
+  var nuevo = prompt('Editar Actividad:', actual);
   if (nuevo === null) return;
   nuevo = nuevo.trim();
   if (!nuevo || nuevo === actual) return;
@@ -326,7 +326,7 @@ function render() {
         var row = document.createElement('div');
         row.className = 'proceso-block';
         var aspectos = arbol[gestionActiva][p];
-        row.innerHTML = '<div class="proceso-title"><span>' + p + '</span></div><p class="muted" style="margin:0;">' + aspectos.length + ' aspecto(s)</p>';
+        row.innerHTML = '<div class="proceso-title"><span>' + p + '</span></div><p class="muted" style="margin:0;">' + aspectos.length + ' actividad(es)</p>';
         var btnRow = document.createElement('div');
         btnRow.style.cssText = 'display:flex; gap:8px; margin-top:8px;';
         var entrar = document.createElement('button');
@@ -353,9 +353,9 @@ function render() {
   } else if (nivelActual === 'aspectos') {
     breadcrumb.innerHTML = '<span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'gestiones\')">‹ Todas las Gestiones</span> &nbsp;/&nbsp; <span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'procesos\', \'' + gestionActiva.replace(/'/g,"\\'") + '\')">' + gestionActiva + '</span>';
     header.innerHTML = '<p style="font-size:15px; font-weight:600; margin:0;">Gestión: ' + gestionActiva + '<br>Proceso: ' + procesoActivo + '</p>';
-    agregarLabel.textContent = 'Agregar Aspecto dentro de "' + procesoActivo + '"';
+    agregarLabel.textContent = 'Agregar Actividad dentro de "' + procesoActivo + '"';
     input.placeholder = 'Ej: Control de inventario';
-    listaLabel.textContent = 'Aspectos de este Proceso';
+    listaLabel.textContent = 'Actividades de este Proceso';
 
     var aspectos = (arbol[gestionActiva] && arbol[gestionActiva][procesoActivo]) ? arbol[gestionActiva][procesoActivo] : [];
     if (aspectos.length === 0) { vacioEl.style.display = 'block'; return; }
@@ -403,6 +403,15 @@ function borrarTodo() {
 
 window.addEventListener('focus', function(){ renderAuditoriaSelector(); render(); });
 document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); render(); } });
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(err) {
+      console.log('No se pudo activar el uso sin conexión:', err);
+    });
+  });
+}
 </script>
 </body>
 </html>
