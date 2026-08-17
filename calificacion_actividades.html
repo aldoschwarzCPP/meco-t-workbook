@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MECO-T — Calificación de Actividades</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 16px 60px;
+    background: #FFFFFF;
+    color: #1a1a1a;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+  p.subtitle { font-size: 13px; color: #666; margin: 0 0 20px; }
+  label.field-label { font-size: 11px; color: #999; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.02em; }
+  input, select, textarea {
+    font-family: inherit;
+    font-size: 14px;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: #fff;
+  }
+  textarea { resize: vertical; min-height: 50px; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    padding: 9px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+  }
+  .section-label { font-size: 13px; color: #444; margin: 20px 0 8px; font-weight: 600; }
+  .muted { font-size: 11px; color: #999; }
+  .card { background: #f7f7f5; border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+  .card-title { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .row5 { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; }
+  .row5 label { font-size: 9px; text-align:center; margin-bottom:2px; }
+  .row5 input { padding: 6px 4px; text-align:center; margin-bottom:0; }
+  .result-bar { border-radius: 10px; padding: 14px; margin: 12px 0; }
+  .result-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align:center; }
+  .result-grid .num { font-size: 20px; font-weight: 600; }
+  .result-grid .lbl { font-size: 10px; margin-top:2px; }
+  .r-inherente { background:#fdecea; }
+  .r-eficacia { background:#eaf3fb; }
+  .r-residual { background:#eaf7ed; }
+  .ref-box { background:#fff8e6; border-radius:8px; padding:8px 10px; font-size:11px; color:#8a6d1f; margin-bottom:8px; }
+</style>
+</head>
+<body>
+
+<h1>Calificación de Actividades</h1>
+<p class="subtitle">MECO-T Field Workbook — Riesgo Inherente, Eficacia de Controles y Riesgo Residual.</p>
+
+<div style="background:#f7f7f5; border:1px solid #2a78d6; border-radius:10px; padding:12px 14px; margin-bottom:16px;">
+  <label class="field-label" style="margin-bottom:2px;">Auditoría actual</label>
+  <p style="font-size:14px; font-weight:600; margin:0 0 8px;" id="auditoriaActualDisplay">Sin seleccionar</p>
+  <select id="auditoriaSelect" onchange="onAuditoriaSelectChange()" style="margin:0;"></select>
+  <div id="nuevaAuditoriaBlock" style="display:none; margin-top:8px;">
+    <input id="nuevaAuditoriaTexto" type="text" placeholder="Ej: Minera-Norte-2026">
+    <button type="button" onclick="confirmarNuevaAuditoria()" style="width:100%;">Usar esta auditoría</button>
+  </div>
+</div>
+
+<p id="breadcrumb" class="muted" style="margin:0 0 8px; font-size:13px;"></p>
+<div id="nivelHeader" style="margin-bottom:12px;"></div>
+<div id="contenido"></div>
+<p class="muted" id="listaVacia" style="display:none;"></p>
+
+<script>
+var AUDITORIA_KEY = 'meco_t_auditoria_actual';
+var AUDITORIAS_LISTA_KEY = 'meco_t_auditorias_conocidas';
+
+function obtenerAuditoriaActual() {
+  try { return localStorage.getItem(AUDITORIA_KEY) || ''; } catch (e) { return ''; }
+}
+function obtenerAuditoriasConocidas() {
+  try { var r = localStorage.getItem(AUDITORIAS_LISTA_KEY); return r ? JSON.parse(r) : []; } catch (e) { return []; }
+}
+function guardarAuditoriasConocidas(l) { try { localStorage.setItem(AUDITORIAS_LISTA_KEY, JSON.stringify(l)); } catch (e) {} }
+function slugAuditoria(n) { return (n||'default').trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,''); }
+function establecerAuditoriaActual(n) {
+  try { localStorage.setItem(AUDITORIA_KEY, n); } catch (e) {}
+  var l = obtenerAuditoriasConocidas();
+  if (l.indexOf(n) === -1) { l.push(n); guardarAuditoriasConocidas(l); }
+}
+function renderAuditoriaSelector() {
+  var actual = obtenerAuditoriaActual();
+  document.getElementById('auditoriaActualDisplay').textContent = actual || 'Sin seleccionar todavía';
+  var conocidas = obtenerAuditoriasConocidas();
+  var sel = document.getElementById('auditoriaSelect');
+  var html = '';
+  if (!actual) html += '<option value="">Elige o crea una auditoría</option>';
+  for (var i=0;i<conocidas.length;i++) html += '<option value="'+conocidas[i].replace(/"/g,'&quot;')+'">'+conocidas[i]+'</option>';
+  html += '<option value="__nueva__">+ Nueva auditoría</option>';
+  sel.innerHTML = html;
+  if (actual) sel.value = actual;
+}
+function onAuditoriaSelectChange() {
+  var sel = document.getElementById('auditoriaSelect');
+  if (sel.value === '__nueva__') { document.getElementById('nuevaAuditoriaBlock').style.display = 'block'; }
+  else if (sel.value) {
+    document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
+    establecerAuditoriaActual(sel.value);
+    renderAuditoriaSelector();
+    nivelActual='gestiones'; gestionActiva=null; procesoActivo=null;
+    render();
+  }
+}
+function confirmarNuevaAuditoria() {
+  var t = document.getElementById('nuevaAuditoriaTexto').value.trim();
+  if (!t) return;
+  establecerAuditoriaActual(t);
+  document.getElementById('nuevaAuditoriaTexto').value='';
+  document.getElementById('nuevaAuditoriaBlock').style.display='none';
+  renderAuditoriaSelector();
+  nivelActual='gestiones'; gestionActiva=null; procesoActivo=null;
+  render();
+}
+renderAuditoriaSelector();
+
+function getArbolKey() { return 'meco_t_arbol_aspectos_v1_' + slugAuditoria(obtenerAuditoriaActual()); }
+function getPesosAspectoKey() { return 'meco_t_pesos_aspecto_v1_' + slugAuditoria(obtenerAuditoriaActual()); }
+function getCalifProcesoKey() { return 'meco_t_calif_proceso_v1_' + slugAuditoria(obtenerAuditoriaActual()); }
+function getCalifActividadKey() { return 'meco_t_calif_actividad_v1_' + slugAuditoria(obtenerAuditoriaActual()); }
+function leerJSON(k) { try { var r = localStorage.getItem(k); return r ? JSON.parse(r) : null; } catch(e) { return null; } }
+function escribirJSON(k,v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch(e) {} }
+function cargarArbol() { return leerJSON(getArbolKey()) || {}; }
+function cargarPesosAspecto() { return leerJSON(getPesosAspectoKey()) || {}; }
+function cargarCalifProceso() { return leerJSON(getCalifProcesoKey()) || {}; }
+function guardarCalifProceso(d) { escribirJSON(getCalifProcesoKey(), d); }
+function cargarCalifActividad() { return leerJSON(getCalifActividadKey()) || {}; }
+function guardarCalifActividad(d) { escribirJSON(getCalifActividadKey(), d); }
+function claveProceso(g,p) { return g+'::'+p; }
+function claveAspecto(g,p,a) { return g+'::'+p+'::'+a; }
+
+var nivelActual = 'gestiones';
+var gestionActiva = null;
+var procesoActivo = null;
+
+function irANivel(n,g,p) { nivelActual=n; gestionActiva=g||null; procesoActivo=p||null; render(); }
+
+function calcularEficacia(g, p) {
+  var arbol = cargarArbol();
+  var pesos = cargarPesosAspecto();
+  var califs = cargarCalifActividad();
+  var actividades = (arbol[g] && arbol[g][p]) ? arbol[g][p] : [];
+  var suma = 0, sumaPeso = 0;
+  for (var i=0;i<actividades.length;i++) {
+    var a = actividades[i];
+    var peso = (pesos[claveAspecto(g,p,a)] ? pesos[claveAspecto(g,p,a)].peso : 0) || 0;
+    var cal = (califs[claveAspecto(g,p,a)] ? califs[claveAspecto(g,p,a)].calificacion : 0) || 0;
+    suma += peso * cal;
+    sumaPeso += peso;
+  }
+  return sumaPeso > 0 ? Math.round(suma / sumaPeso) : 0;
+}
+function calcularRiesgos(g, p) {
+  var cp = cargarCalifProceso()[claveProceso(g,p)] || {};
+  var prob = Number(cp.probabilidad) || 0;
+  var dims = [cp.impacto_personas, cp.impacto_operacion, cp.impacto_activos, cp.impacto_cumplimiento, cp.impacto_reputacion].map(function(v){ return Number(v)||0; });
+  var impacto = Math.max.apply(null, dims);
+  var inherente = Math.round(prob * impacto / 100);
+  var eficacia = calcularEficacia(g,p);
+  var residual = Math.round(inherente * (1 - eficacia/100));
+  return { prob: prob, impacto: impacto, inherente: inherente, eficacia: eficacia, residual: residual };
+}
+
+function actualizarCalifProceso(g,p,campo,valor) {
+  var d = cargarCalifProceso();
+  var k = claveProceso(g,p);
+  if (!d[k]) d[k] = {};
+  d[k][campo] = valor;
+  guardarCalifProceso(d);
+}
+function actualizarCalifActividad(g,p,a,campo,valor) {
+  var d = cargarCalifActividad();
+  var k = claveAspecto(g,p,a);
+  if (!d[k]) d[k] = {};
+  d[k][campo] = valor;
+  guardarCalifActividad(d);
+}
+
+function actualizarBarraResultados(g,p) {
+  var r = calcularRiesgos(g,p);
+  var bar = document.getElementById('resultBar');
+  if (!bar) return;
+  bar.innerHTML =
+    '<div class="r-inherente" style="border-radius:10px; padding:10px;"><div class="num">'+r.inherente+'</div><div class="lbl">Inherente</div></div>'+
+    '<div class="r-eficacia" style="border-radius:10px; padding:10px;"><div class="num">'+r.eficacia+'%</div><div class="lbl">Eficacia controles</div></div>'+
+    '<div class="r-residual" style="border-radius:10px; padding:10px;"><div class="num">'+r.residual+'</div><div class="lbl">Residual</div></div>';
+}
+
+function render() {
+  var arbol = cargarArbol();
+  var breadcrumb = document.getElementById('breadcrumb');
+  var header = document.getElementById('nivelHeader');
+  var cont = document.getElementById('contenido');
+  var vacio = document.getElementById('listaVacia');
+  header.innerHTML = ''; cont.innerHTML = ''; vacio.style.display = 'none';
+
+  if (nivelActual === 'gestiones') {
+    breadcrumb.textContent = '';
+    var gestiones = Object.keys(arbol);
+    if (gestiones.length === 0) { vacio.style.display='block'; vacio.textContent='No hay Gestiones configuradas. Ve primero a "Configuración de Gestión Auditada".'; return; }
+    for (var i=0;i<gestiones.length;i++) {
+      (function(g){
+        var procesos = Object.keys(arbol[g]);
+        var card = document.createElement('div');
+        card.className='card';
+        card.innerHTML = '<p class="card-title">'+g+'</p><p class="muted" style="margin:0 0 8px;">'+procesos.length+' proceso(s)</p>';
+        var btn = document.createElement('button');
+        btn.type='button'; btn.textContent='Ver Procesos de esta Gestión'; btn.style.width='100%';
+        btn.onclick=function(){ irANivel('procesos', g); };
+        card.appendChild(btn);
+        cont.appendChild(card);
+      })(gestiones[i]);
+    }
+
+  } else if (nivelActual === 'procesos') {
+    breadcrumb.innerHTML = '<span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'gestiones\')">‹ Todas las Gestiones</span>';
+    header.innerHTML = '<p style="font-size:15px; font-weight:600; margin:0;">'+gestionActiva+'</p>';
+    var procesos = Object.keys(arbol[gestionActiva] || {});
+    if (procesos.length === 0) { vacio.style.display='block'; vacio.textContent='Esta Gestión no tiene Procesos.'; return; }
+    for (var j=0;j<procesos.length;j++) {
+      (function(p){
+        var r = calcularRiesgos(gestionActiva, p);
+        var card = document.createElement('div');
+        card.className='card';
+        card.innerHTML = '<p class="card-title">'+p+'</p>';
+        var rg = document.createElement('div');
+        rg.className='result-grid';
+        rg.innerHTML =
+          '<div><div class="num">'+r.inherente+'</div><div class="lbl">Inherente</div></div>'+
+          '<div><div class="num">'+r.eficacia+'%</div><div class="lbl">Eficacia controles</div></div>'+
+          '<div><div class="num">'+r.residual+'</div><div class="lbl">Residual</div></div>';
+        card.appendChild(rg);
+        var btn = document.createElement('button');
+        btn.type='button'; btn.textContent='Calificar este Proceso'; btn.style.width='100%'; btn.style.marginTop='10px';
+        btn.onclick=function(){ irANivel('detalle', gestionActiva, p); };
+        card.appendChild(btn);
+        cont.appendChild(card);
+      })(procesos[j]);
+    }
+
+  } else if (nivelActual === 'detalle') {
+    var g = gestionActiva, p = procesoActivo;
+    breadcrumb.innerHTML = '<span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'gestiones\')">‹ Todas las Gestiones</span> &nbsp;/&nbsp; <span style="color:#2a78d6; cursor:pointer;" onclick="irANivel(\'procesos\', \''+g.replace(/'/g,"\\'")+'\')">'+g+'</span>';
+    header.innerHTML = '<p style="font-size:15px; font-weight:600; margin:0;">'+g+' › '+p+'</p>';
+
+    var r = calcularRiesgos(g,p);
+    var resBar = document.createElement('div');
+    resBar.id = 'resultBar';
+    resBar.className = 'result-grid';
+    resBar.style.marginBottom = '16px';
+    resBar.innerHTML =
+      '<div class="r-inherente" style="border-radius:10px; padding:10px;"><div class="num">'+r.inherente+'</div><div class="lbl">Inherente</div></div>'+
+      '<div class="r-eficacia" style="border-radius:10px; padding:10px;"><div class="num">'+r.eficacia+'%</div><div class="lbl">Eficacia controles</div></div>'+
+      '<div class="r-residual" style="border-radius:10px; padding:10px;"><div class="num">'+r.residual+'</div><div class="lbl">Residual</div></div>';
+    cont.appendChild(resBar);
+
+    var cp = cargarCalifProceso()[claveProceso(g,p)] || {};
+
+    var cardProb = document.createElement('div');
+    cardProb.className='card';
+    cardProb.innerHTML =
+      '<p class="card-title" style="margin-top:0;">Probabilidad (Amenaza demostrada)</p>'+
+      '<div class="ref-box">N0 sin evidencia ≈ 0-20 · N1 indicios ≈ 21-40 · N2 un intento ≈ 41-60 · N3 intentos repetidos ≈ 61-80 · N4 intentos exitosos recientes ≈ 81-100</div>'+
+      '<label class="field-label">Probabilidad (1-100)</label>'+
+      '<input type="number" min="0" max="100" id="inProb" value="'+(cp.probabilidad||'')+'">'+
+      '<label class="field-label">Justificación</label>'+
+      '<textarea id="inProbJustif" placeholder="Evidencia que sustenta este nivel de amenaza">'+(cp.prob_justif||'')+'</textarea>';
+    cont.appendChild(cardProb);
+    document.getElementById('inProb').oninput = function(){ actualizarCalifProceso(g,p,'probabilidad', this.value); actualizarBarraResultados(g,p); };
+    document.getElementById('inProbJustif').oninput = function(){ actualizarCalifProceso(g,p,'prob_justif', this.value); };
+
+    var cardImp = document.createElement('div');
+    cardImp.className='card';
+    var dims = [
+      {k:'impacto_personas', l:'Personas'},
+      {k:'impacto_operacion', l:'Operación'},
+      {k:'impacto_activos', l:'Activos'},
+      {k:'impacto_cumplimiento', l:'Cumplim.'},
+      {k:'impacto_reputacion', l:'Reputación'}
+    ];
+    var rowHtml = '<div class="row5">';
+    for (var d=0; d<dims.length; d++) {
+      rowHtml += '<div><label>'+dims[d].l+'</label><input type="number" min="0" max="100" id="'+dims[d].k+'" value="'+(cp[dims[d].k]||'')+'"></div>';
+    }
+    rowHtml += '</div>';
+    cardImp.innerHTML =
+      '<p class="card-title" style="margin-top:0;">Impacto (1-100 por dimensión)</p>'+
+      '<div class="ref-box">El Impacto final del Proceso es el valor más alto entre las cinco dimensiones.</div>'+
+      rowHtml+
+      '<label class="field-label">Justificación</label>'+
+      '<textarea id="inImpJustif" placeholder="Qué consecuencia concreta se proyecta en cada dimensión relevante">'+(cp.impacto_justif||'')+'</textarea>';
+    cont.appendChild(cardImp);
+    for (var d2=0; d2<dims.length; d2++) {
+      (function(campo){
+        document.getElementById(campo).oninput = function(){ actualizarCalifProceso(g,p,campo, this.value); actualizarBarraResultados(g,p); };
+      })(dims[d2].k);
+    }
+    document.getElementById('inImpJustif').oninput = function(){ actualizarCalifProceso(g,p,'impacto_justif', this.value); };
+
+    var lbl = document.createElement('p');
+    lbl.className='section-label';
+    lbl.textContent = 'Actividades de este Proceso';
+    cont.appendChild(lbl);
+
+    var actividades = (arbol[g] && arbol[g][p]) ? arbol[g][p] : [];
+    var califAct = cargarCalifActividad();
+    for (var k=0;k<actividades.length;k++) {
+      (function(a){
+        var ca = califAct[claveAspecto(g,p,a)] || {};
+        var card = document.createElement('div');
+        card.className='card';
+        card.innerHTML =
+          '<p class="card-title" style="margin-top:0;">'+a+'</p>'+
+          '<div class="ref-box">Nivel 1: 00-15% · Nivel 2: 16-25% · Nivel 3: 26-45% · Nivel 4: 46-60% · Nivel 5: 61-75% · Nivel 6: 76-100%</div>'+
+          '<label class="field-label">Calificación (1-100)</label>'+
+          '<input type="number" min="0" max="100" id="calif_'+k+'" value="'+(ca.calificacion||'')+'">'+
+          '<label class="field-label">Justificación</label>'+
+          '<textarea id="justif_'+k+'" placeholder="Evidencia que sustenta esta calificación">'+(ca.justificacion||'')+'</textarea>';
+        cont.appendChild(card);
+        document.getElementById('calif_'+k).oninput = function(){ actualizarCalifActividad(g,p,a,'calificacion', this.value); actualizarBarraResultados(g,p); };
+        document.getElementById('justif_'+k).oninput = function(){ actualizarCalifActividad(g,p,a,'justificacion', this.value); };
+      })(actividades[k]);
+    }
+  }
+}
+render();
+
+window.addEventListener('focus', function(){ renderAuditoriaSelector(); render(); });
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); render(); } });
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('sw.js').catch(function(err) {
+      console.log('No se pudo activar el uso sin conexión:', err);
+    });
+  });
+}
+</script>
+</body>
+</html>
