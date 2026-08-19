@@ -259,6 +259,34 @@ function editarAspecto(g, p, idx) {
   render();
 }
 
+function moverActividad(g, p, idx, direccion) {
+  var arbol = cargarArbol();
+  var lista = arbol[g][p];
+  var nuevoIdx = idx + direccion;
+  if (nuevoIdx < 0 || nuevoIdx >= lista.length) return;
+  var temp = lista[idx];
+  lista[idx] = lista[nuevoIdx];
+  lista[nuevoIdx] = temp;
+  guardarArbol(arbol);
+  render();
+}
+
+function moverProceso(g, p, direccion) {
+  var arbol = cargarArbol();
+  var claves = Object.keys(arbol[g]);
+  var idx = claves.indexOf(p);
+  var nuevoIdx = idx + direccion;
+  if (nuevoIdx < 0 || nuevoIdx >= claves.length) return;
+  var temp = claves[idx];
+  claves[idx] = claves[nuevoIdx];
+  claves[nuevoIdx] = temp;
+  var nuevoObj = {};
+  for (var i=0;i<claves.length;i++) { nuevoObj[claves[i]] = arbol[g][claves[i]]; }
+  arbol[g] = nuevoObj;
+  guardarArbol(arbol);
+  render();
+}
+
 function render() {
   var arbol = cargarArbol();
   var breadcrumb = document.getElementById('breadcrumb');
@@ -328,7 +356,17 @@ function render() {
         var aspectos = arbol[gestionActiva][p];
         row.innerHTML = '<div class="proceso-title"><span>' + p + '</span></div><p class="muted" style="margin:0;">' + aspectos.length + ' actividad(es)</p>';
         var btnRow = document.createElement('div');
-        btnRow.style.cssText = 'display:flex; gap:8px; margin-top:8px;';
+        btnRow.style.cssText = 'display:flex; gap:6px; margin-top:8px;';
+        var subir = document.createElement('button');
+        subir.type = 'button';
+        subir.textContent = '▲';
+        subir.style.cssText = 'padding:6px 10px;';
+        subir.onclick = function(){ moverProceso(gestionActiva, p, -1); };
+        var bajar = document.createElement('button');
+        bajar.type = 'button';
+        bajar.textContent = '▼';
+        bajar.style.cssText = 'padding:6px 10px;';
+        bajar.onclick = function(){ moverProceso(gestionActiva, p, 1); };
         var entrar = document.createElement('button');
         entrar.type = 'button';
         entrar.textContent = 'Entrar';
@@ -342,6 +380,8 @@ function render() {
         quitar.type = 'button';
         quitar.textContent = 'Quitar';
         quitar.onclick = function(){ eliminarProceso(gestionActiva, p); };
+        btnRow.appendChild(subir);
+        btnRow.appendChild(bajar);
         btnRow.appendChild(entrar);
         btnRow.appendChild(editar);
         btnRow.appendChild(quitar);
@@ -364,21 +404,39 @@ function render() {
       (function(idx){
         var row = document.createElement('div');
         row.className = 'aspecto-row';
-        row.style.paddingLeft = '0';
-        var span = document.createElement('span');
+        row.style.cssText = 'padding-left:0; display:block; padding-top:8px; padding-bottom:8px;';
+        var span = document.createElement('div');
         span.className = 'txt';
+        span.style.marginBottom = '6px';
         span.textContent = aspectos[idx];
         row.appendChild(span);
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex; gap:6px;';
+        var subir = document.createElement('button');
+        subir.type = 'button';
+        subir.textContent = '▲';
+        subir.style.cssText = 'padding:5px 9px; font-size:11px;';
+        subir.onclick = function(){ moverActividad(gestionActiva, procesoActivo, idx, -1); };
+        var bajar = document.createElement('button');
+        bajar.type = 'button';
+        bajar.textContent = '▼';
+        bajar.style.cssText = 'padding:5px 9px; font-size:11px;';
+        bajar.onclick = function(){ moverActividad(gestionActiva, procesoActivo, idx, 1); };
         var editar = document.createElement('button');
         editar.type = 'button';
         editar.textContent = 'Editar';
+        editar.style.cssText = 'padding:5px 9px; font-size:11px;';
         editar.onclick = function(){ editarAspecto(gestionActiva, procesoActivo, idx); };
-        row.appendChild(editar);
         var quitar = document.createElement('button');
         quitar.type = 'button';
         quitar.textContent = 'Quitar';
+        quitar.style.cssText = 'padding:5px 9px; font-size:11px;';
         quitar.onclick = function(){ eliminarAspecto(gestionActiva, procesoActivo, idx); };
-        row.appendChild(quitar);
+        btnRow.appendChild(subir);
+        btnRow.appendChild(bajar);
+        btnRow.appendChild(editar);
+        btnRow.appendChild(quitar);
+        row.appendChild(btnRow);
         listaEl.appendChild(row);
       })(k);
     }
