@@ -8,7 +8,7 @@
   * { box-sizing: border-box; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    max-width: 480px;
+    max-width: 560px;
     margin: 0 auto;
     padding: 20px 16px 60px;
     background: #FFFFFF;
@@ -17,7 +17,7 @@
   h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
   p.subtitle { font-size: 13px; color: #666; margin: 0 0 20px; }
   label.field-label { font-size: 11px; color: #999; display: block; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.02em; }
-  input, textarea {
+  input, textarea, select {
     font-family: inherit;
     font-size: 14px;
     width: 100%;
@@ -42,10 +42,19 @@
   .section-label { font-size: 13px; color: #444; margin: 20px 0 8px; font-weight: 600; }
   .muted { font-size: 11px; color: #999; }
   .card { background: #f7f7f5; border-radius: 10px; padding: 14px; margin-bottom: 16px; }
-  .hip-row { display:flex; align-items:center; gap:8px; padding:10px 0; border-bottom:1px solid #eee; font-size:13px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .hip-row { display:flex; align-items:flex-start; gap:8px; padding:10px 0; border-bottom:1px solid #eee; font-size:13px; }
   .hip-row .text { flex:1; }
+  .hip-row .cod { font-weight:600; }
+  .hip-row .meta { font-size:11px; color:#888; margin-top:3px; }
+  .hip-row .warn { font-size:11px; color:#c0392b; margin-top:3px; }
   .hip-row button { padding: 5px 10px; font-size: 12px; }
+  .grupo-g { font-size:14px; font-weight:600; margin:18px 0 4px; padding-bottom:4px; border-bottom:2px solid #1a1a1a; }
+  .grupo-p { font-size:12px; font-weight:600; color:#2a78d6; margin:10px 0 0; }
   .count-badge { display:inline-block; background:#1a1a1a; color:#fff; border-radius:12px; padding:2px 10px; font-size:12px; margin-left:6px; }
+  .badge-campo { font-size:10px; color:#a5670f; border:1px solid #d68a1f; border-radius:4px; padding:0 5px; margin-left:4px; }
+  .msg-ok { background:#e8f6ee; color:#1e7a44; border-radius:8px; padding:10px; font-size:12px; margin-bottom:10px; display:none; white-space:pre-line; }
+  .msg-warn { background:#fdecea; color:#a02a1e; border-radius:8px; padding:10px; font-size:12px; margin-bottom:10px; display:none; white-space:pre-line; }
 </style>
 </head>
 <body>
@@ -66,20 +75,53 @@
 </div>
 
 <div class="card">
-  <p class="section-label" style="margin-top:0;">Carga inicial — desde la Fase II</p>
-  <p class="muted" style="margin:0 0 8px;">Pega aquí las hipótesis ya formuladas antes de salir a campo, una por línea. Ejemplo: "H-04 — Escasa rotación de Agentes en polvorines"</p>
-  <textarea id="cargaMasiva" placeholder="H-01 — Primera hipótesis...&#10;H-02 — Segunda hipótesis...&#10;H-03 — Tercera hipótesis..."></textarea>
-  <button type="button" class="primary" onclick="cargarLote()">Cargar todas a la lista</button>
+  <p class="section-label" style="margin-top:0;">Carga masiva — una Gestión a la vez</p>
+  <p class="muted" style="margin:0 0 8px;">1) Elige la Gestión (y el Proceso, si ya está definido). 2) Pega las hipótesis, una por línea, con este formato: <strong>CÓDIGO · título corto</strong>. El código es lo que te lleva al enunciado completo en tu Lista de Hipótesis. Si una línea no trae código, se carga igual, marcada “sin código”.</p>
+  <label class="field-label">Gestión</label>
+  <select id="loteGestion" onchange="llenarProcesos('loteGestion','loteProceso','')"></select>
+  <label class="field-label">Proceso (opcional — se puede asignar después con “Editar”)</label>
+  <select id="loteProceso"></select>
+  <textarea id="cargaMasiva" placeholder="HIP-SUPAC-01 · A · Nadie verifica con UTM si la labor está dentro de la Concesión&#10;HIP-SUPAC-02 · A · Sin procedimiento formal para retirar la autorización"></textarea>
+  <div class="msg-ok" id="loteOk"></div>
+  <div class="msg-warn" id="loteWarn"></div>
+  <button type="button" class="primary" onclick="cargarLote()">Cargar a la lista</button>
+</div>
+
+<div class="card" id="editorCard" style="display:none; border:1px solid #2a78d6;">
+  <p class="section-label" style="margin-top:0;" id="editorTitulo">Editar hipótesis</p>
+  <div class="row2">
+    <div>
+      <label class="field-label">Código</label>
+      <input id="edCodigo" type="text" placeholder="Ej: HIP-SUPAC-03">
+    </div>
+    <div>
+      <label class="field-label">Origen</label>
+      <input id="edOrigen" type="text" disabled>
+    </div>
+  </div>
+  <label class="field-label">Título corto</label>
+  <input id="edTitulo" type="text">
+  <label class="field-label">Gestión</label>
+  <select id="edGestion" onchange="llenarProcesos('edGestion','edProceso','')"></select>
+  <label class="field-label">Proceso</label>
+  <select id="edProceso"></select>
+  <div class="msg-warn" id="edWarn"></div>
+  <div class="row2">
+    <button type="button" onclick="cerrarEditor()">Cancelar</button>
+    <button type="button" onclick="guardarEditor()" style="background:#1a1a1a; color:#fff; border:none;">Guardar</button>
+  </div>
 </div>
 
 <p class="section-label" style="margin-top:0;">Hipótesis vigentes<span class="count-badge" id="contador">0</span></p>
-<p class="muted" style="margin:0 0 10px;">Esta lista es la misma que usan la Captura de Entrevista y el Resumen del Día para la auditoría actual — cualquier cambio aquí se refleja allá también.</p>
+<p class="muted" style="margin:0 0 10px;">Esta lista es la misma que usan la Captura de Entrevista y el Resumen del Día para la auditoría actual — cualquier cambio aquí se refleja allá también. Las creadas durante una entrevista aparecen marcadas “campo”.</p>
+<label class="field-label">Ver</label>
+<select id="filtroVer" onchange="renderLista()"></select>
+<div class="msg-warn" id="listaWarn"></div>
 <div id="hipotesisList"></div>
 <p class="muted" id="sinHipotesis" style="display:none;">Todavía no hay hipótesis cargadas para esta auditoría.</p>
 
 <p class="section-label">Agregar una hipótesis suelta</p>
-<input id="nuevaIndividual" type="text" placeholder="Ej: H-07 — Videovigilancia sin capacidad nocturna">
-<button type="button" onclick="agregarIndividual()" style="width:100%;">Agregar a la lista</button>
+<button type="button" onclick="abrirEditor(-1)" style="width:100%;">＋ Nueva hipótesis</button>
 
 <p class="section-label">Reiniciar esta auditoría</p>
 <p class="muted" style="margin:0 0 8px;">Borra solo las hipótesis de la auditoría actualmente seleccionada arriba — las demás auditorías no se ven afectadas.</p>
@@ -88,6 +130,7 @@
 <script>
 var AUDITORIA_KEY = 'meco_t_auditoria_actual';
 var AUDITORIAS_LISTA_KEY = 'meco_t_auditorias_conocidas';
+var SIN_ASIGNAR = '';
 
 function obtenerAuditoriaActual() {
   try { return localStorage.getItem(AUDITORIA_KEY) || ''; } catch (e) { return ''; }
@@ -107,6 +150,12 @@ function slugAuditoria(nombre) {
 function getHipotesisKey() {
   return 'meco_t_hipotesis_v1_' + slugAuditoria(obtenerAuditoriaActual());
 }
+function getArbolKey() {
+  return 'meco_t_arbol_aspectos_v1_' + slugAuditoria(obtenerAuditoriaActual());
+}
+function cargarArbol() {
+  try { var raw = localStorage.getItem(getArbolKey()); return raw ? JSON.parse(raw) : {}; } catch (e) { return {}; }
+}
 function establecerAuditoriaActual(nombre) {
   try { localStorage.setItem(AUDITORIA_KEY, nombre); } catch (e) {}
   var lista = obtenerAuditoriasConocidas();
@@ -120,7 +169,7 @@ function renderAuditoriaSelector() {
   var html = '';
   if (!actual) html += '<option value="">Elige o crea una auditoría</option>';
   for (var i=0;i<conocidas.length;i++) {
-    html += '<option value="' + conocidas[i].replace(/"/g,'&quot;') + '">' + conocidas[i] + '</option>';
+    html += '<option value="' + esc(conocidas[i]) + '">' + esc(conocidas[i]) + '</option>';
   }
   html += '<option value="__nueva__">+ Nueva auditoría</option>';
   sel.innerHTML = html;
@@ -133,8 +182,7 @@ function onAuditoriaSelectChange() {
   } else if (sel.value) {
     document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
     establecerAuditoriaActual(sel.value);
-    renderAuditoriaSelector();
-    renderLista();
+    refrescarTodo();
   }
 }
 function confirmarNuevaAuditoria() {
@@ -143,96 +191,272 @@ function confirmarNuevaAuditoria() {
   establecerAuditoriaActual(texto);
   document.getElementById('nuevaAuditoriaTexto').value = '';
   document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
-  renderAuditoriaSelector();
-  renderLista();
+  refrescarTodo();
 }
-renderAuditoriaSelector();
+
+/* ---------- Modelo de hipótesis (compatible con listas anteriores de solo texto) ---------- */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function normHip(h) {
+  if (h && typeof h === 'object') {
+    return {
+      codigo: String(h.codigo || '').trim(),
+      titulo: String(h.titulo || '').trim(),
+      gestion: h.gestion || '',
+      proceso: h.proceso || '',
+      origen: h.origen || 'configuracion',
+      entrevista_origen: h.entrevista_origen || '',
+      registro_origen: h.registro_origen || '',
+      fecha_creacion: h.fecha_creacion || ''
+    };
+  }
+  return { codigo:'', titulo:String(h == null ? '' : h).trim(), gestion:'', proceso:'', origen:'texto_anterior', entrevista_origen:'', registro_origen:'', fecha_creacion:'' };
+}
+function etiquetaHip(h) { h = normHip(h); return (h.codigo ? h.codigo + ' — ' : '') + h.titulo; }
+function claveHip(h) { h = normHip(h); return h.codigo ? 'C:' + h.codigo.toUpperCase() : 'T:' + h.titulo.toLowerCase(); }
 
 function cargarHipotesis() {
   try {
     var raw = localStorage.getItem(getHipotesisKey());
-    return raw ? JSON.parse(raw) : [];
+    var lista = raw ? JSON.parse(raw) : [];
+    return Array.isArray(lista) ? lista.map(normHip) : [];
   } catch (e) { return []; }
 }
 function guardarLista(lista) {
-  try { localStorage.setItem(getHipotesisKey(), JSON.stringify(lista)); } catch (e) {}
+  try { localStorage.setItem(getHipotesisKey(), JSON.stringify(lista.map(normHip))); return true; }
+  catch (e) { alert('No se pudo guardar en este navegador: ' + e.message); return false; }
 }
 
-function renderLista() {
-  var lista = cargarHipotesis();
-  var el = document.getElementById('hipotesisList');
-  var vacio = document.getElementById('sinHipotesis');
-  document.getElementById('contador').textContent = lista.length;
-  el.innerHTML = '';
-  if (lista.length === 0) {
-    vacio.style.display = 'block';
-    return;
-  }
-  vacio.style.display = 'none';
-  for (var i=0;i<lista.length;i++) {
-    (function(idx){
-      var row = document.createElement('div');
-      row.className = 'hip-row';
-      var span = document.createElement('span');
-      span.className = 'text';
-      span.textContent = lista[idx];
-      row.appendChild(span);
-      var editBtn = document.createElement('button');
-      editBtn.type = 'button';
-      editBtn.textContent = 'Editar';
-      editBtn.onclick = function(){
-        var actual = cargarHipotesis();
-        var nuevo = prompt('Editar hipótesis:', actual[idx]);
-        if (nuevo !== null && nuevo.trim()) {
-          actual[idx] = nuevo.trim();
-          guardarLista(actual);
-          renderLista();
-        }
-      };
-      var delBtn = document.createElement('button');
-      delBtn.type = 'button';
-      delBtn.textContent = 'Quitar';
-      delBtn.onclick = function(){
-        var actual = cargarHipotesis();
-        actual.splice(idx,1);
-        guardarLista(actual);
-        renderLista();
-      };
-      row.appendChild(editBtn);
-      row.appendChild(delBtn);
-      el.appendChild(row);
-    })(i);
-  }
+/* Separa "CÓDIGO · título". El código debe contener al menos un dígito y no tener espacios. */
+function parsearLinea(linea) {
+  var m = linea.match(/^([A-Za-z0-9][A-Za-z0-9_.\-]*[A-Za-z0-9])\s*(?:\||·|—|–|-|:|\t)\s*(.+)$/);
+  if (m && /\d/.test(m[1]) && m[1].length <= 30) return { codigo: m[1], titulo: m[2].trim() };
+  return { codigo: '', titulo: linea };
 }
-renderLista();
 
+/* ---------- Selectores de Gestión / Proceso ---------- */
+function llenarGestiones(idSel, valor) {
+  var arbol = cargarArbol();
+  var html = '<option value="">(sin Gestión asignada)</option>';
+  var existe = false;
+  for (var g in arbol) {
+    html += '<option value="' + esc(g) + '">' + esc(g) + '</option>';
+    if (g === valor) existe = true;
+  }
+  if (valor && !existe) html += '<option value="' + esc(valor) + '">' + esc(valor) + ' (no existe en la estructura)</option>';
+  var sel = document.getElementById(idSel);
+  sel.innerHTML = html;
+  sel.value = valor || '';
+}
+function llenarProcesos(idSelG, idSelP, valor) {
+  var arbol = cargarArbol();
+  var g = document.getElementById(idSelG).value;
+  var html = '<option value="">(Proceso sin asignar)</option>';
+  var existe = false;
+  var procs = (g && arbol[g]) ? Object.keys(arbol[g]) : [];
+  for (var i=0;i<procs.length;i++) {
+    html += '<option value="' + esc(procs[i]) + '">' + esc(procs[i]) + '</option>';
+    if (procs[i] === valor) existe = true;
+  }
+  if (valor && !existe) html += '<option value="' + esc(valor) + '">' + esc(valor) + ' (no existe en la estructura)</option>';
+  var sel = document.getElementById(idSelP);
+  sel.innerHTML = html;
+  sel.value = valor || '';
+}
+function llenarFiltro() {
+  var sel = document.getElementById('filtroVer');
+  var previo = sel.value;
+  var arbol = cargarArbol();
+  var html = '<option value="__todas__">Todas las Gestiones</option>';
+  for (var g in arbol) html += '<option value="' + esc(g) + '">' + esc(g) + '</option>';
+  html += '<option value="__sin__">Sin Gestión asignada</option>';
+  sel.innerHTML = html;
+  sel.value = previo || '__todas__';
+  if (!sel.value) sel.value = '__todas__';
+}
+
+/* ---------- Carga masiva ---------- */
 function cargarLote() {
-  var texto = document.getElementById('cargaMasiva').value;
-  var lineas = texto.split('\n');
+  var ok = document.getElementById('loteOk'), warn = document.getElementById('loteWarn');
+  ok.style.display = 'none'; warn.style.display = 'none';
+  if (!obtenerAuditoriaActual()) { warn.textContent = 'Selecciona primero la auditoría, arriba.'; warn.style.display = 'block'; return; }
+  var gestion = document.getElementById('loteGestion').value;
+  var proceso = document.getElementById('loteProceso').value;
+  var lineas = document.getElementById('cargaMasiva').value.split('\n');
   var lista = cargarHipotesis();
-  var agregadas = 0;
-  for (var i=0;i<lineas.length;i++) {
-    var linea = lineas[i].trim();
-    if (linea && lista.indexOf(linea) === -1) {
-      lista.push(linea);
-      agregadas++;
+  var claves = {};
+  for (var i=0;i<lista.length;i++) claves[claveHip(lista[i])] = true;
+  var agregadas = 0, omitidas = [], sinCodigo = 0;
+  var ahora = new Date().toISOString();
+  for (var j=0;j<lineas.length;j++) {
+    var linea = lineas[j].trim();
+    if (!linea) continue;
+    var p = parsearLinea(linea);
+    var h = normHip({ codigo:p.codigo, titulo:p.titulo, gestion:gestion, proceso:proceso, origen:'configuracion', fecha_creacion:ahora });
+    var k = claveHip(h);
+    if (claves[k]) { omitidas.push(etiquetaHip(h)); continue; }
+    claves[k] = true;
+    if (!h.codigo) sinCodigo++;
+    lista.push(h);
+    agregadas++;
+  }
+  if (!guardarLista(lista)) return;
+  document.getElementById('cargaMasiva').value = '';
+  ok.textContent = agregadas + ' hipótesis agregadas' + (gestion ? ' a “' + gestion + '”' : ' (sin Gestión asignada)') + (proceso ? ' › “' + proceso + '”' : '') + '.' + (sinCodigo ? '\n' + sinCodigo + ' de ellas sin código.' : '');
+  ok.style.display = 'block';
+  if (omitidas.length) {
+    warn.textContent = omitidas.length + ' omitidas porque su código (o texto) ya existe en la lista:\n• ' + omitidas.join('\n• ');
+    warn.style.display = 'block';
+  }
+  renderLista();
+}
+
+/* ---------- Editor (nueva o existente) ---------- */
+var editIdx = -1;
+function abrirEditor(idx) {
+  editIdx = idx;
+  var h = idx >= 0 ? cargarHipotesis()[idx] : normHip({ origen:'configuracion' });
+  document.getElementById('editorTitulo').textContent = idx >= 0 ? 'Editar hipótesis' : 'Nueva hipótesis';
+  document.getElementById('edCodigo').value = h.codigo;
+  document.getElementById('edTitulo').value = h.titulo;
+  document.getElementById('edOrigen').value = h.origen === 'campo' ? ('Campo · ' + (h.entrevista_origen || 's/ID') + (h.registro_origen ? ' · ' + h.registro_origen : '')) : (h.origen === 'texto_anterior' ? 'Lista anterior (solo texto)' : 'Configuración');
+  llenarGestiones('edGestion', h.gestion);
+  llenarProcesos('edGestion', 'edProceso', h.proceso);
+  document.getElementById('edWarn').style.display = 'none';
+  document.getElementById('editorCard').style.display = 'block';
+  document.getElementById('editorCard').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function cerrarEditor() {
+  editIdx = -1;
+  document.getElementById('editorCard').style.display = 'none';
+}
+function guardarEditor() {
+  var warn = document.getElementById('edWarn');
+  warn.style.display = 'none';
+  var lista = cargarHipotesis();
+  var base = editIdx >= 0 ? lista[editIdx] : normHip({ origen:'configuracion', fecha_creacion:new Date().toISOString() });
+  var nueva = normHip(base);
+  nueva.codigo = document.getElementById('edCodigo').value.trim();
+  nueva.titulo = document.getElementById('edTitulo').value.trim();
+  nueva.gestion = document.getElementById('edGestion').value;
+  nueva.proceso = document.getElementById('edProceso').value;
+  if (!nueva.titulo) { warn.textContent = 'El título no puede quedar vacío.'; warn.style.display = 'block'; return; }
+  var k = claveHip(nueva);
+  for (var i=0;i<lista.length;i++) {
+    if (i !== editIdx && claveHip(lista[i]) === k) {
+      warn.textContent = 'Ya existe otra hipótesis con ese ' + (nueva.codigo ? 'código' : 'texto') + ': ' + etiquetaHip(lista[i]);
+      warn.style.display = 'block';
+      return;
     }
   }
-  guardarLista(lista);
-  document.getElementById('cargaMasiva').value = '';
+  if (editIdx >= 0) lista[editIdx] = nueva; else lista.push(nueva);
+  if (!guardarLista(lista)) return;
+  cerrarEditor();
   renderLista();
-  alert(agregadas + ' hipótesis agregadas a la lista.');
 }
 
-function agregarIndividual() {
-  var input = document.getElementById('nuevaIndividual');
-  var texto = input.value.trim();
-  if (!texto) return;
+/* ---------- Lista agrupada por Gestión › Proceso ---------- */
+function renderLista() {
   var lista = cargarHipotesis();
-  if (lista.indexOf(texto) === -1) lista.push(texto);
-  guardarLista(lista);
-  input.value = '';
-  renderLista();
+  var arbol = cargarArbol();
+  var el = document.getElementById('hipotesisList');
+  var vacio = document.getElementById('sinHipotesis');
+  var listaWarn = document.getElementById('listaWarn');
+  document.getElementById('contador').textContent = lista.length;
+  el.innerHTML = '';
+  listaWarn.style.display = 'none';
+  if (lista.length === 0) { vacio.style.display = 'block'; return; }
+  vacio.style.display = 'none';
+
+  // Aviso de códigos repetidos (pueden venir de listas antiguas o de importaciones)
+  var vistos = {}, repetidos = [];
+  for (var r=0;r<lista.length;r++) {
+    if (!lista[r].codigo) continue;
+    var kc = lista[r].codigo.toUpperCase();
+    if (vistos[kc]) { if (repetidos.indexOf(lista[r].codigo) === -1) repetidos.push(lista[r].codigo); } else vistos[kc] = true;
+  }
+  if (repetidos.length) { listaWarn.textContent = 'Códigos repetidos en la lista: ' + repetidos.join(', ') + '. Corrígelos con “Editar” para no confundir la trazabilidad.'; listaWarn.style.display = 'block'; }
+
+  var filtro = document.getElementById('filtroVer').value || '__todas__';
+  var grupos = {}, ordenG = [];
+  for (var i=0;i<lista.length;i++) {
+    var h = lista[i];
+    var g = h.gestion || '__sin__';
+    if (filtro !== '__todas__' && filtro !== g) continue;
+    if (!grupos[g]) { grupos[g] = {}; ordenG.push(g); }
+    var p = h.proceso || '__sinp__';
+    if (!grupos[g][p]) grupos[g][p] = [];
+    grupos[g][p].push(i);
+  }
+  // Orden: Gestiones en el orden de la estructura, luego las que no existen, al final "sin Gestión"
+  var ordenFinal = [];
+  for (var ga in arbol) if (grupos[ga]) ordenFinal.push(ga);
+  for (var x=0;x<ordenG.length;x++) if (ordenFinal.indexOf(ordenG[x]) === -1 && ordenG[x] !== '__sin__') ordenFinal.push(ordenG[x]);
+  if (grupos['__sin__']) ordenFinal.push('__sin__');
+
+  if (ordenFinal.length === 0) { el.innerHTML = '<p class="muted">No hay hipótesis en este filtro.</p>'; return; }
+
+  for (var a=0;a<ordenFinal.length;a++) {
+    var gName = ordenFinal[a];
+    var tituloG = document.createElement('div');
+    tituloG.className = 'grupo-g';
+    tituloG.textContent = gName === '__sin__' ? 'Sin Gestión asignada' : gName + (arbol[gName] ? '' : ' — (no existe en la estructura)');
+    el.appendChild(tituloG);
+    var procs = Object.keys(grupos[gName]);
+    // Procesos en el orden de la estructura; "sin Proceso" al final
+    var ordP = [];
+    if (arbol[gName]) for (var pa in arbol[gName]) if (grupos[gName][pa]) ordP.push(pa);
+    for (var y=0;y<procs.length;y++) if (ordP.indexOf(procs[y]) === -1 && procs[y] !== '__sinp__') ordP.push(procs[y]);
+    if (grupos[gName]['__sinp__']) ordP.push('__sinp__');
+    for (var b=0;b<ordP.length;b++) {
+      var pName = ordP[b];
+      var tituloP = document.createElement('div');
+      tituloP.className = 'grupo-p';
+      tituloP.textContent = pName === '__sinp__' ? 'Proceso sin asignar' : pName;
+      el.appendChild(tituloP);
+      var idxs = grupos[gName][pName];
+      for (var c=0;c<idxs.length;c++) el.appendChild(filaHipotesis(lista[idxs[c]], idxs[c], arbol));
+    }
+  }
+}
+function filaHipotesis(h, idx, arbol) {
+  var row = document.createElement('div');
+  row.className = 'hip-row';
+  var txt = document.createElement('div');
+  txt.className = 'text';
+  var linea = document.createElement('div');
+  if (h.codigo) {
+    var cod = document.createElement('span'); cod.className = 'cod'; cod.textContent = h.codigo + ' — ';
+    linea.appendChild(cod);
+  }
+  linea.appendChild(document.createTextNode(h.titulo));
+  if (h.origen === 'campo') { var bc = document.createElement('span'); bc.className = 'badge-campo'; bc.textContent = 'campo'; linea.appendChild(bc); }
+  txt.appendChild(linea);
+  var meta = [];
+  if (!h.codigo) meta.push('sin código');
+  if (h.origen === 'campo') meta.push('creada en ' + (h.entrevista_origen || 'entrevista s/ID') + (h.registro_origen ? ' · ' + h.registro_origen : '') + (h.fecha_creacion ? ' · ' + h.fecha_creacion.substring(0,10) : ''));
+  if (h.origen === 'texto_anterior') meta.push('lista anterior — asigna código, Gestión y Proceso con “Editar”');
+  if (meta.length) { var m = document.createElement('div'); m.className = 'meta'; m.textContent = meta.join(' · '); txt.appendChild(m); }
+  if (h.gestion && arbol[h.gestion] && h.proceso && !arbol[h.gestion][h.proceso]) {
+    var w = document.createElement('div'); w.className = 'warn'; w.textContent = 'El Proceso “' + h.proceso + '” ya no existe en la estructura (¿se renombró?).'; txt.appendChild(w);
+  }
+  row.appendChild(txt);
+  var eb = document.createElement('button'); eb.type = 'button'; eb.textContent = 'Editar';
+  eb.onclick = function(){ abrirEditor(idx); };
+  var db = document.createElement('button'); db.type = 'button'; db.textContent = 'Quitar';
+  db.onclick = function(){
+    var lista = cargarHipotesis();
+    if (!lista[idx] || claveHip(lista[idx]) !== claveHip(h)) { renderLista(); return; }
+    if (!confirm('¿Quitar “' + etiquetaHip(h) + '” de la lista? Los expedientes de entrevista ya exportados no se modifican.')) return;
+    lista.splice(idx, 1);
+    guardarLista(lista);
+    cerrarEditor();
+    renderLista();
+  };
+  row.appendChild(eb);
+  row.appendChild(db);
+  return row;
 }
 
 function borrarTodo() {
@@ -246,6 +470,20 @@ function borrarTodo() {
     alert('Lista borrada para "' + nombreAud + '" en este dispositivo.');
   }
 }
+
+function refrescarTodo() {
+  renderAuditoriaSelector();
+  var gPrev = document.getElementById('loteGestion').value;
+  var pPrev = document.getElementById('loteProceso').value;
+  llenarGestiones('loteGestion', gPrev && cargarArbol()[gPrev] ? gPrev : '');
+  llenarProcesos('loteGestion', 'loteProceso', pPrev);
+  llenarFiltro();
+  renderLista();
+}
+refrescarTodo();
+window.addEventListener('storage', function(e){ if (e.key === getHipotesisKey() || e.key === getArbolKey() || e.key === AUDITORIA_KEY) refrescarTodo(); });
+window.addEventListener('focus', function(){ if (document.getElementById('editorCard').style.display !== 'block') refrescarTodo(); });
+document.addEventListener('visibilitychange', function(){ if (!document.hidden && document.getElementById('editorCard').style.display !== 'block') refrescarTodo(); });
 </script>
 <script>
 if ('serviceWorker' in navigator) {
