@@ -59,6 +59,26 @@
   #saveStatus { font-size:12px; color:#2a9d4f; margin-top:8px; display:none; }
   .summary-box { background:#f7f7f5; border-radius:10px; padding:14px; margin-bottom:16px; font-size:13px; color:#444; }
   .summary-box div { margin-bottom:4px; }
+  .msg-warn { background:#fdecea; color:#a02a1e; border-radius:8px; padding:10px; font-size:12px; margin:0 0 10px; display:none; white-space:pre-line; }
+  .hip-scroll { max-height:320px; overflow-y:auto; border:1px solid #ddd; border-radius:8px; background:#fff; }
+  .hip-reg-row { padding:8px 10px; border-bottom:1px solid #eee; font-size:13px; }
+  .hip-reg-text { margin-bottom:6px; }
+  .hip-reg-btns { display:flex; gap:6px; }
+  .hip-reg-btns button { flex:1; padding:6px 4px; font-size:11px; }
+  .hip-reg-btns button.on { border-width:2px; font-weight:600; }
+  button.ef-fortalece.on { border-color:#2a9d4f; color:#2a9d4f; }
+  button.ef-debilita.on { border-color:#c0392b; color:#c0392b; }
+  button.ef-contexto.on { border-color:#2a78d6; color:#2a78d6; }
+  .chip { font-size:12px; border-radius:6px; padding:5px 8px; margin:4px 0; border:1px solid #ccc; background:#fff; }
+  .chip button { padding:0 6px; font-size:11px; margin-left:4px; }
+  .chip.ef-fortalece { border-color:#2a9d4f; color:#1e7a44; }
+  .chip.ef-debilita { border-color:#c0392b; color:#a02a1e; }
+  .chip.ef-contexto { border-color:#2a78d6; color:#1f5fa8; }
+  .chip.ef-origina { border-color:#d68a1f; color:#a5670f; }
+  .reg-card { background:#f7f7f5; border-radius:10px; padding:12px; margin-bottom:10px; font-size:13px; }
+  .reg-card.anulado { opacity:0.55; }
+  .reg-head { font-weight:600; margin-bottom:4px; }
+  .reg-cita { font-style:italic; margin:6px 0; }
 </style>
 </head>
 <body>
@@ -84,6 +104,8 @@
 
 <!-- STEP 1 -->
 <div id="step1">
+  <label class="field-label">ID de entrevista (del registro maestro)</label>
+  <input id="entrevistaId" type="text" placeholder="Ej: SP-ENT-012" autocapitalize="characters">
   <label class="field-label">Foto conjunta (entrevistado + entrevistador)</label>
   <input type="file" id="fotoInput" accept="image/*" capture="environment" onchange="onFotoCapturada(event)" style="margin-bottom:8px;">
   <div id="fotoPreviewBox" style="display:none; margin-bottom:12px;">
@@ -178,19 +200,75 @@
   <label class="field-label">Justificación / Observaciones (hallazgo físico que sustenta lo seleccionado)</label>
   <textarea id="justificacionConducta" placeholder="Describe lo observado, en tus palabras"></textarea>
 
-  <label class="field-label">Hipótesis relacionada (opcional)</label>
-  <div style="display:flex; gap:8px; margin-bottom:10px;">
-    <select id="hipotesisSelect" onchange="onHipotesisSelectChange()" style="margin:0; flex:1;"></select>
-    <button type="button" onclick="renderHipotesisSelect()" style="padding:0 14px;">Actualizar lista</button>
+  <div class="card" id="audioCard" style="border:1px solid #d68a1f;">
+    <p class="section-label" style="margin-top:0;">Sincronía con el audio (Notas de Voz)</p>
+    <p class="muted" style="margin:0 0 8px;">Toca este botón en el mismo instante en que presionas GRABAR en Notas de Voz. Si detienes la grabación y vuelves a grabar, tócalo otra vez: se abre un segmento nuevo (el audio nunca se edita, se conserva en segmentos sucesivos). Cada declaración registrada guarda el minuto exacto del segmento.</p>
+    <button type="button" id="btnSegmento" onclick="marcarSegmento()" style="width:100%; border-color:#c0392b; color:#c0392b;">● Presioné GRABAR — iniciar segmento 1</button>
+    <p id="segmentoEstado" class="muted" style="margin:8px 0 0;">Ningún segmento marcado todavía.</p>
   </div>
-  <div id="nuevaHipotesisBlock" style="display:none;">
-    <input id="nuevaHipotesisTexto" type="text" placeholder="Ej: H-04 — Escasa rotación de Agentes en polvorines">
-    <button type="button" onclick="guardarNuevaHipotesis()" style="width:100%; margin-bottom:10px;">Guardar esta hipótesis en la lista</button>
+
+  <p class="section-label">Validación de hipótesis — declaraciones y evidencias</p>
+  <p class="muted" style="margin:-4px 0 8px;">Cada registro guarda: quién lo dijo, hora, segmento y minuto del audio, lo que dijo textualmente, las hipótesis que afecta (una o varias) y las fotos o videos de respaldo.</p>
+  <button type="button" class="primary" id="btnAbrirRegistro" onclick="abrirRegistro()">＋ Registrar declaración / evidencia</button>
+
+  <div class="card" id="registroForm" style="display:none; margin-top:10px; border:1px solid #2a78d6;">
+    <p style="font-size:14px; font-weight:600; margin:0 0 4px;" id="regTitulo">Registro</p>
+    <p class="muted" id="regHoraInfo" style="margin:0 0 6px;"></p>
+    <button type="button" onclick="actualizarHoraRegistro()" style="padding:5px 10px; font-size:11px; margin-bottom:12px;">Usar la hora de este momento</button>
+
+    <div class="row2">
+      <div>
+        <label class="field-label">¿Quién lo manifestó?</label>
+        <input id="regDeclarante" type="text" placeholder="Nombre">
+      </div>
+      <div>
+        <label class="field-label">Cargo / relación</label>
+        <input id="regDeclaranteCargo" type="text" placeholder="Si no es el entrevistado">
+      </div>
+    </div>
+
+    <label class="field-label">¿Qué dijo? — textual, lo más literal posible</label>
+    <textarea id="regCita" placeholder="Escribe sus palabras, entre comillas si puedes"></textarea>
+    <p class="muted" style="margin:-6px 0 12px;">Queda marcado “anotado en campo — verificar contra la transcripción”: la cita definitiva se confirma escuchando el audio en el minuto registrado.</p>
+
+    <label class="field-label">Hipótesis que afecta — puedes marcar varias</label>
+    <div id="regSeleccionadas" style="margin-bottom:8px;"></div>
+    <div class="row2">
+      <select id="regFiltro" onchange="renderRegHipList()"></select>
+      <input id="regBuscar" type="text" placeholder="Buscar código o palabra" oninput="renderRegHipList()">
+    </div>
+    <div id="regHipList" class="hip-scroll"></div>
+    <button type="button" onclick="toggleNuevaHipReg()" style="width:100%; margin:8px 0 10px;">＋ Crear hipótesis nueva a partir de esta declaración</button>
+    <div id="regNuevaHip" style="display:none; background:#fff; border:1px dashed #d68a1f; border-radius:8px; padding:10px; margin-bottom:12px;">
+      <label class="field-label">Código (sugerido — puedes cambiarlo)</label>
+      <input id="nhCodigo" type="text">
+      <label class="field-label">Título corto</label>
+      <input id="nhTitulo" type="text" placeholder="Ej: Vigilantes rotan puesto solo por decisión verbal">
+      <label class="field-label">Gestión</label>
+      <select id="nhGestion" onchange="llenarProcesosNH('')"></select>
+      <label class="field-label">Proceso</label>
+      <select id="nhProceso"></select>
+      <p class="msg-warn" id="nhWarn"></p>
+      <button type="button" onclick="crearHipotesisDesdeRegistro()" style="width:100%; background:#1a1a1a; color:#fff; border:none;">Crear, guardar en la lista y marcar en este registro</button>
+    </div>
+
+    <label class="field-label">Nota del auditor (contexto, no es cita)</label>
+    <textarea id="regNota" placeholder="Qué estaba ocurriendo, qué documento mostró, etc."></textarea>
+
+    <label class="field-label">Fotos / videos de respaldo (puedes elegir varios)</label>
+    <input type="file" id="regMedia" accept="image/*,video/*" multiple onchange="onRegMedia(event)" style="margin-bottom:6px;">
+    <div id="regMediaList" style="margin-bottom:12px;"></div>
+
+    <p class="msg-warn" id="regWarn"></p>
+    <div class="row2">
+      <button type="button" onclick="cancelarRegistro()">Cancelar</button>
+      <button type="button" onclick="guardarRegistro()" style="background:#1a1a1a; color:#fff; border:none;">Guardar registro</button>
+    </div>
   </div>
-  <div class="row2" style="margin-bottom:14px;">
-    <button type="button" onclick="setEfectoHipotesis('fortalece')" id="btnFortalece">Fortalece la hipótesis</button>
-    <button type="button" onclick="setEfectoHipotesis('debilita')" id="btnDebilita">Debilita la hipótesis</button>
-  </div>
+
+  <div id="registrosList" style="margin:12px 0 16px;"></div>
+  <input type="file" id="mediaExtraInput" accept="image/*,video/*" multiple onchange="onMediaExtra(event)" style="display:none;">
+
 
   <p class="section-label">Nota rápida (información emergente)</p>
   <textarea id="notaLibre" placeholder="Ej: evitó contacto visual al mencionar al Supervisor de Acopio"></textarea>
@@ -228,7 +306,6 @@ function cargarArbol() {
 
 var consentimiento = null, seconds = 0, timerInterval = null, paused = false;
 var evidenceCount = 0, scanCount = 0, fotoOk = false;
-var efectoHipotesis = null;
 
 var AUDITORIA_KEY = 'meco_t_auditoria_actual';
 var AUDITORIAS_LISTA_KEY = 'meco_t_auditorias_conocidas';
@@ -278,7 +355,7 @@ function onAuditoriaSelectChange() {
     document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
     establecerAuditoriaActual(sel.value);
     renderAuditoriaSelector();
-    renderHipotesisSelect();
+    refrescarHipotesisUI();
     initGestion();
   }
 }
@@ -289,56 +366,457 @@ function confirmarNuevaAuditoria() {
   document.getElementById('nuevaAuditoriaTexto').value = '';
   document.getElementById('nuevaAuditoriaBlock').style.display = 'none';
   renderAuditoriaSelector();
-  renderHipotesisSelect();
+  refrescarHipotesisUI();
   initGestion();
 }
 renderAuditoriaSelector();
 
+/* ======================================================================
+   HIPÓTESIS — modelo compatible con listas anteriores de solo texto
+   ====================================================================== */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function normHip(h) {
+  if (h && typeof h === 'object') {
+    return {
+      codigo: String(h.codigo || '').trim(),
+      titulo: String(h.titulo || '').trim(),
+      gestion: h.gestion || '',
+      proceso: h.proceso || '',
+      origen: h.origen || 'configuracion',
+      entrevista_origen: h.entrevista_origen || '',
+      registro_origen: h.registro_origen || '',
+      fecha_creacion: h.fecha_creacion || ''
+    };
+  }
+  return { codigo:'', titulo:String(h == null ? '' : h).trim(), gestion:'', proceso:'', origen:'texto_anterior', entrevista_origen:'', registro_origen:'', fecha_creacion:'' };
+}
+function etiquetaHip(h) { h = normHip(h); return (h.codigo ? h.codigo + ' — ' : '') + h.titulo; }
+function claveHip(h) { h = normHip(h); return h.codigo ? 'C:' + h.codigo.toUpperCase() : 'T:' + h.titulo.toLowerCase(); }
+
 function cargarHipotesis() {
   try {
     var raw = localStorage.getItem(getHipotesisKey());
-    return raw ? JSON.parse(raw) : [];
+    var lista = raw ? JSON.parse(raw) : [];
+    return Array.isArray(lista) ? lista.map(normHip) : [];
   } catch (e) { return []; }
 }
 function guardarListaHipotesis(lista) {
-  try { localStorage.setItem(getHipotesisKey(), JSON.stringify(lista)); } catch (e) {}
+  try { localStorage.setItem(getHipotesisKey(), JSON.stringify(lista.map(normHip))); return true; }
+  catch (e) { alert('No se pudo guardar la hipótesis en este navegador: ' + e.message); return false; }
 }
-function renderHipotesisSelect(seleccionar) {
-  var lista = cargarHipotesis();
-  var sel = document.getElementById('hipotesisSelect');
-  var html = '<option value="">Sin registrar</option>';
-  for (var i=0;i<lista.length;i++) {
-    html += '<option value="' + lista[i].replace(/"/g,'&quot;') + '">' + lista[i] + '</option>';
-  }
-  html += '<option value="__nueva__">+ Nueva hipótesis</option>';
-  sel.innerHTML = html;
-  if (seleccionar) sel.value = seleccionar;
-}
-function onHipotesisSelectChange() {
-  var sel = document.getElementById('hipotesisSelect');
-  var bloque = document.getElementById('nuevaHipotesisBlock');
-  bloque.style.display = sel.value === '__nueva__' ? 'block' : 'none';
-}
-function guardarNuevaHipotesis() {
-  var texto = document.getElementById('nuevaHipotesisTexto').value.trim();
-  if (!texto) return;
-  var lista = cargarHipotesis();
-  if (lista.indexOf(texto) === -1) lista.push(texto);
-  guardarListaHipotesis(lista);
-  renderHipotesisSelect(texto);
-  document.getElementById('nuevaHipotesisBlock').style.display = 'none';
-  document.getElementById('nuevaHipotesisTexto').value = '';
-}
-renderHipotesisSelect();
-window.addEventListener('storage', function(e){ if (e.key === getHipotesisKey() || e.key === AUDITORIA_KEY) { renderAuditoriaSelector(); renderHipotesisSelect(document.getElementById('hipotesisSelect').value); } });
-window.addEventListener('focus', function(){ renderAuditoriaSelector(); renderHipotesisSelect(document.getElementById('hipotesisSelect').value); });
-document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); renderHipotesisSelect(document.getElementById('hipotesisSelect').value); } });
 
-function setEfectoHipotesis(v) {
-  efectoHipotesis = (efectoHipotesis === v) ? null : v;
-  document.getElementById('btnFortalece').className = efectoHipotesis === 'fortalece' ? 'active' : '';
-  document.getElementById('btnDebilita').className = efectoHipotesis === 'debilita' ? 'active' : '';
+/* ======================================================================
+   ESTADO DE LA ENTREVISTA
+   ====================================================================== */
+var validaciones = [];          // registros V01, V02, ... en orden de captura
+var segmentosAudio = [];        // [{segmento, inicio_iso, inicio_hora, inicioMs}]
+var contadorRegistro = 0;       // último número usado (nunca se reutiliza)
+var regActual = null;           // registro en edición
+var hipCreadasAqui = [];        // hipótesis creadas durante esta entrevista
+var mediaExtraTarget = -1;
+var EFECTOS = { fortalece:'Fortalece', debilita:'Debilita', contexto:'Contexto', origina:'Origina (nueva)' };
+
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+function horaLocal(d) { return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()); }
+function fmtDur(ms) {
+  var t = Math.max(0, Math.floor(ms / 1000));
+  var h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  return (h > 0 ? h + ':' + pad2(m) : pad2(m)) + ':' + pad2(s);
 }
+function idEntrevista() { return (document.getElementById('entrevistaId').value || '').trim(); }
+function idRegistro(n) { return 'V' + pad2(n); }
+
+/* ---------- Segmentos de audio ---------- */
+function marcarSegmento() {
+  if (consentimiento !== 'Acepta') {
+    if (!confirm('No está registrado que el entrevistado autorice la grabación. ¿Marcar igual el inicio de un segmento de audio?')) return;
+  }
+  var n = segmentosAudio.length + 1;
+  if (n > 1 && !confirm('¿Detuviste la grabación y presionaste GRABAR de nuevo? Se abrirá el segmento ' + n + '.')) return;
+  var ahora = new Date();
+  segmentosAudio.push({ segmento: n, inicio_iso: ahora.toISOString(), inicio_hora: horaLocal(ahora), inicioMs: ahora.getTime() });
+  document.getElementById('btnSegmento').textContent = '● Presioné GRABAR de nuevo — iniciar segmento ' + (n + 1);
+  actualizarEstadoSegmento();
+}
+function actualizarEstadoSegmento() {
+  var el = document.getElementById('segmentoEstado');
+  if (!el) return;
+  if (segmentosAudio.length === 0) { el.textContent = 'Ningún segmento marcado todavía.'; return; }
+  var s = segmentosAudio[segmentosAudio.length - 1];
+  el.textContent = 'Segmento ' + s.segmento + ' desde las ' + s.inicio_hora + ' · transcurrido ' + fmtDur(Date.now() - s.inicioMs);
+}
+setInterval(actualizarEstadoSegmento, 1000);
+function posicionAudio(d) {
+  var ms = d.getTime(), seg = null;
+  for (var i=0;i<segmentosAudio.length;i++) if (segmentosAudio[i].inicioMs <= ms) seg = segmentosAudio[i];
+  if (!seg) return null;
+  return { segmento: seg.segmento, minuto: fmtDur(ms - seg.inicioMs) };
+}
+function textoPosicion(d) {
+  var p = posicionAudio(d);
+  return 'Hora ' + horaLocal(d) + ' · ' + (p ? 'Audio: segmento ' + p.segmento + ', minuto ' + p.minuto : 'Audio: ningún segmento marcado');
+}
+
+/* ---------- Formulario de registro ---------- */
+function abrirRegistro() {
+  if (regActual) { document.getElementById('registroForm').scrollIntoView({ behavior:'smooth' }); return; }
+  regActual = { num: contadorRegistro + 1, fecha: new Date(), sel: {}, orden: [], media: [], creadas: [] };
+  document.getElementById('regTitulo').textContent = 'Registro ' + idRegistro(regActual.num) + (idEntrevista() ? ' · ' + idEntrevista() : ' · (entrevista sin ID)');
+  document.getElementById('regHoraInfo').textContent = textoPosicion(regActual.fecha);
+  document.getElementById('regDeclarante').value = document.getElementById('entrevistado').value || '';
+  document.getElementById('regDeclaranteCargo').value = document.getElementById('cargo').value || '';
+  document.getElementById('regCita').value = '';
+  document.getElementById('regNota').value = '';
+  document.getElementById('regBuscar').value = '';
+  document.getElementById('regMediaList').innerHTML = '';
+  document.getElementById('regWarn').style.display = 'none';
+  document.getElementById('regNuevaHip').style.display = 'none';
+  llenarFiltroReg();
+  renderRegHipList();
+  renderRegSeleccionadas();
+  document.getElementById('registroForm').style.display = 'block';
+  document.getElementById('btnAbrirRegistro').style.display = 'none';
+}
+function actualizarHoraRegistro() {
+  if (!regActual) return;
+  regActual.fecha = new Date();
+  document.getElementById('regHoraInfo').textContent = textoPosicion(regActual.fecha);
+}
+function cerrarFormRegistro() {
+  regActual = null;
+  document.getElementById('registroForm').style.display = 'none';
+  document.getElementById('btnAbrirRegistro').style.display = 'block';
+}
+function cancelarRegistro() {
+  if (!regActual) return;
+  var msg = '¿Descartar este registro?';
+  if (regActual.creadas.length) msg += '\n\nOjo: ' + regActual.creadas.length + ' hipótesis creada(s) en él ya quedaron guardadas en la lista y NO se borran (se marcarán “registro descartado”).';
+  if (!confirm(msg)) return;
+  if (regActual.creadas.length) {
+    var lista = cargarHipotesis();
+    for (var i=0;i<lista.length;i++) {
+      for (var j=0;j<regActual.creadas.length;j++) {
+        if (claveHip(lista[i]) === claveHip(regActual.creadas[j])) lista[i].registro_origen = 'registro descartado';
+      }
+    }
+    guardarListaHipotesis(lista);
+    for (var k=0;k<hipCreadasAqui.length;k++) {
+      for (var m=0;m<regActual.creadas.length;m++) if (claveHip(hipCreadasAqui[k]) === claveHip(regActual.creadas[m])) hipCreadasAqui[k].registro_origen = 'registro descartado';
+    }
+  }
+  cerrarFormRegistro();
+}
+
+function llenarFiltroReg() {
+  var sel = document.getElementById('regFiltro');
+  var gAct = document.getElementById('gestion').value;
+  var arbol = cargarArbol();
+  var html = '<option value="__actual__">Esta Gestión</option><option value="__todas__">Todas las Gestiones</option>';
+  for (var g in arbol) html += '<option value="' + esc(g) + '">' + esc(g) + '</option>';
+  sel.innerHTML = html;
+  sel.value = arbol[gAct] ? '__actual__' : '__todas__';
+}
+function renderRegHipList() {
+  if (!regActual) return;
+  var el = document.getElementById('regHipList');
+  var lista = cargarHipotesis();
+  var filtro = document.getElementById('regFiltro').value;
+  var gAct = document.getElementById('gestion').value;
+  var q = (document.getElementById('regBuscar').value || '').trim().toLowerCase();
+  el.innerHTML = '';
+  var n = 0;
+  for (var i=0;i<lista.length;i++) {
+    var h = lista[i];
+    if (filtro === '__actual__' && h.gestion && h.gestion !== gAct) continue;
+    if (filtro !== '__actual__' && filtro !== '__todas__' && h.gestion !== filtro) continue;
+    if (q && (etiquetaHip(h) + ' ' + h.gestion + ' ' + h.proceso).toLowerCase().indexOf(q) === -1) continue;
+    el.appendChild(filaHipReg(h));
+    n++;
+  }
+  if (n === 0) el.innerHTML = '<p class="muted" style="padding:8px;">No hay hipótesis en este filtro. Cambia el filtro o crea una nueva.</p>';
+}
+function filaHipReg(h) {
+  var k = claveHip(h);
+  var row = document.createElement('div');
+  row.className = 'hip-reg-row';
+  var t = document.createElement('div');
+  t.className = 'hip-reg-text';
+  if (h.codigo) { var b = document.createElement('strong'); b.textContent = h.codigo + ' '; t.appendChild(b); }
+  t.appendChild(document.createTextNode(h.titulo));
+  var meta = document.createElement('div');
+  meta.className = 'muted';
+  meta.textContent = (h.gestion || 'Sin Gestión') + (h.proceso ? ' › ' + h.proceso : '');
+  t.appendChild(meta);
+  row.appendChild(t);
+  var btns = document.createElement('div');
+  btns.className = 'hip-reg-btns';
+  ['fortalece','debilita','contexto'].forEach(function(ef){
+    var bt = document.createElement('button');
+    bt.type = 'button';
+    bt.textContent = EFECTOS[ef];
+    var actual = regActual.sel[k] ? regActual.sel[k].efecto : null;
+    bt.className = actual === ef ? 'ef-' + ef + ' on' : '';
+    bt.onclick = function(){ marcarEfecto(h, ef); };
+    btns.appendChild(bt);
+  });
+  row.appendChild(btns);
+  return row;
+}
+function marcarEfecto(h, ef) {
+  var k = claveHip(h);
+  if (regActual.sel[k] && regActual.sel[k].efecto === ef) {
+    delete regActual.sel[k];
+    regActual.orden.splice(regActual.orden.indexOf(k), 1);
+  } else {
+    if (!regActual.sel[k]) regActual.orden.push(k);
+    regActual.sel[k] = { hip: normHip(h), efecto: ef };
+  }
+  renderRegHipList();
+  renderRegSeleccionadas();
+}
+function renderRegSeleccionadas() {
+  var el = document.getElementById('regSeleccionadas');
+  el.innerHTML = '';
+  if (!regActual || regActual.orden.length === 0) { el.innerHTML = '<p class="muted" style="margin:0;">Ninguna marcada todavía.</p>'; return; }
+  regActual.orden.forEach(function(k){
+    var s = regActual.sel[k];
+    var chip = document.createElement('div');
+    chip.className = 'chip ef-' + s.efecto;
+    chip.textContent = EFECTOS[s.efecto].toUpperCase() + ' · ' + etiquetaHip(s.hip) + '  ';
+    var x = document.createElement('button');
+    x.type = 'button';
+    x.textContent = '✕';
+    x.onclick = function(){ delete regActual.sel[k]; regActual.orden.splice(regActual.orden.indexOf(k), 1); renderRegHipList(); renderRegSeleccionadas(); };
+    chip.appendChild(x);
+    el.appendChild(chip);
+  });
+}
+
+/* ---------- Hipótesis nueva creada desde el registro ---------- */
+function sugerirCodigo() {
+  var lista = cargarHipotesis();
+  var base = 'HIP-CAMPO-' + (idEntrevista() || 'SINID').toUpperCase().replace(/\s+/g,'') + '-';
+  for (var n=1; n<1000; n++) {
+    var c = base + pad2(n), usado = false;
+    for (var i=0;i<lista.length;i++) if (lista[i].codigo.toUpperCase() === c) { usado = true; break; }
+    if (!usado) return c;
+  }
+  return base + Date.now();
+}
+function toggleNuevaHipReg() {
+  var box = document.getElementById('regNuevaHip');
+  if (box.style.display === 'block') { box.style.display = 'none'; return; }
+  document.getElementById('nhCodigo').value = sugerirCodigo();
+  document.getElementById('nhTitulo').value = '';
+  document.getElementById('nhWarn').style.display = 'none';
+  var arbol = cargarArbol();
+  var gAct = document.getElementById('gestion').value;
+  var html = '<option value="">(sin Gestión asignada)</option>';
+  for (var g in arbol) html += '<option value="' + esc(g) + '">' + esc(g) + '</option>';
+  document.getElementById('nhGestion').innerHTML = html;
+  document.getElementById('nhGestion').value = arbol[gAct] ? gAct : '';
+  llenarProcesosNH(document.getElementById('proceso').value);
+  box.style.display = 'block';
+}
+function llenarProcesosNH(valor) {
+  var arbol = cargarArbol();
+  var g = document.getElementById('nhGestion').value;
+  var html = '<option value="">(Proceso sin asignar)</option>';
+  var procs = (g && arbol[g]) ? Object.keys(arbol[g]) : [];
+  for (var i=0;i<procs.length;i++) html += '<option value="' + esc(procs[i]) + '">' + esc(procs[i]) + '</option>';
+  var sel = document.getElementById('nhProceso');
+  sel.innerHTML = html;
+  sel.value = (valor && procs.indexOf(valor) !== -1) ? valor : '';
+}
+function crearHipotesisDesdeRegistro() {
+  var warn = document.getElementById('nhWarn');
+  warn.style.display = 'none';
+  var codigo = document.getElementById('nhCodigo').value.trim();
+  var titulo = document.getElementById('nhTitulo').value.trim();
+  if (!codigo) { warn.textContent = 'Escribe un código (o deja el sugerido) para mantener la trazabilidad.'; warn.style.display = 'block'; return; }
+  if (!titulo) { warn.textContent = 'Escribe un título corto.'; warn.style.display = 'block'; return; }
+  var lista = cargarHipotesis();
+  var h = normHip({
+    codigo: codigo, titulo: titulo,
+    gestion: document.getElementById('nhGestion').value,
+    proceso: document.getElementById('nhProceso').value,
+    origen: 'campo',
+    entrevista_origen: idEntrevista(),
+    registro_origen: idRegistro(regActual.num),
+    fecha_creacion: new Date().toISOString()
+  });
+  for (var i=0;i<lista.length;i++) {
+    if (claveHip(lista[i]) === claveHip(h)) { warn.textContent = 'Ese código ya existe: ' + etiquetaHip(lista[i]); warn.style.display = 'block'; return; }
+  }
+  lista.push(h);
+  if (!guardarListaHipotesis(lista)) return;
+  hipCreadasAqui.push(normHip(h));
+  regActual.creadas.push(normHip(h));
+  var k = claveHip(h);
+  regActual.sel[k] = { hip: normHip(h), efecto: 'origina' };
+  regActual.orden.push(k);
+  document.getElementById('regNuevaHip').style.display = 'none';
+  renderRegHipList();
+  renderRegSeleccionadas();
+}
+
+/* ---------- Fotos y videos ---------- */
+function extension(nombre) { var m = /\.([A-Za-z0-9]{1,5})$/.exec(nombre || ''); return m ? '.' + m[1].toLowerCase() : ''; }
+function crearMedio(file, numRegistro, numMedio, agregadoDespues) {
+  var esVideo = (file.type || '').indexOf('video') === 0;
+  var ahora = new Date();
+  var base = idEntrevista() || prefijoArchivo();
+  return {
+    archivo: base + '_' + idRegistro(numRegistro) + '_' + (esVideo ? 'video' : 'foto') + '_' + pad2(numMedio) + extension(file.name),
+    nombre_original: file.name,
+    tipo: esVideo ? 'video' : 'foto',
+    tamano_kb: Math.round(file.size / 1024),
+    hora_local: horaLocal(ahora),
+    fecha_iso: ahora.toISOString(),
+    agregado_despues: !!agregadoDespues,
+    guardado: false,
+    url: URL.createObjectURL(file)
+  };
+}
+function filaMedio(m) {
+  var row = document.createElement('div');
+  row.className = 'list-item';
+  var s = document.createElement('span');
+  s.className = 'grow';
+  s.textContent = m.archivo + ' (' + m.tamano_kb + ' KB)';
+  row.appendChild(s);
+  var a = document.createElement('a');
+  a.href = m.url;
+  a.download = m.archivo;
+  a.textContent = m.guardado ? 'Guardar otra vez ✓' : 'Guardar';
+  a.style.color = m.guardado ? '#2a9d4f' : '#2a78d6';
+  a.onclick = function(){ m.guardado = true; a.textContent = 'Guardar otra vez ✓'; a.style.color = '#2a9d4f'; renderResumen(); };
+  row.appendChild(a);
+  return row;
+}
+function onRegMedia(event) {
+  if (!regActual) return;
+  var files = event.target.files;
+  for (var i=0;i<files.length;i++) regActual.media.push(crearMedio(files[i], regActual.num, regActual.media.length + 1, false));
+  var el = document.getElementById('regMediaList');
+  el.innerHTML = '';
+  regActual.media.forEach(function(m){ el.appendChild(filaMedio(m)); });
+  event.target.value = '';
+}
+function agregarMediaExtra(i) {
+  mediaExtraTarget = i;
+  document.getElementById('mediaExtraInput').click();
+}
+function onMediaExtra(event) {
+  var v = validaciones[mediaExtraTarget];
+  if (!v) return;
+  var files = event.target.files;
+  for (var i=0;i<files.length;i++) v.medios.push(crearMedio(files[i], v.numero, v.medios.length + 1, true));
+  event.target.value = '';
+  mediaExtraTarget = -1;
+  renderRegistros();
+  renderResumen();
+}
+
+/* ---------- Guardar y listar registros ---------- */
+function guardarRegistro() {
+  if (!regActual) return;
+  var warn = document.getElementById('regWarn');
+  warn.style.display = 'none';
+  var cita = document.getElementById('regCita').value.trim();
+  var nota = document.getElementById('regNota').value.trim();
+  var declarante = document.getElementById('regDeclarante').value.trim();
+  if (!cita && !nota && regActual.media.length === 0) { warn.textContent = 'El registro está vacío: escribe lo que se dijo, una nota o agrega una foto/video.'; warn.style.display = 'block'; return; }
+  if (cita && !declarante) { warn.textContent = 'Indica quién lo manifestó.'; warn.style.display = 'block'; return; }
+  if (regActual.orden.length === 0 && !confirm('No marcaste ninguna hipótesis. ¿Guardarlo como información emergente (sin hipótesis)?')) return;
+  var pos = posicionAudio(regActual.fecha);
+  var v = {
+    id: idRegistro(regActual.num),
+    numero: regActual.num,
+    hora_local: horaLocal(regActual.fecha),
+    fecha_iso: regActual.fecha.toISOString(),
+    audio_segmento: pos ? pos.segmento : null,
+    audio_minuto: pos ? pos.minuto : null,
+    declarante: declarante,
+    declarante_cargo: document.getElementById('regDeclaranteCargo').value.trim(),
+    cita_textual: cita,
+    cita_estado: cita ? 'anotada_en_campo_pendiente_verificar_con_transcripcion' : '',
+    nota_auditor: nota,
+    hipotesis: regActual.orden.map(function(k){
+      var s = regActual.sel[k];
+      return { codigo: s.hip.codigo, titulo: s.hip.titulo, gestion: s.hip.gestion, proceso: s.hip.proceso, efecto: s.efecto };
+    }),
+    medios: regActual.media,
+    anulado: false
+  };
+  validaciones.push(v);
+  contadorRegistro = regActual.num;
+  cerrarFormRegistro();
+  renderRegistros();
+  renderResumen();
+}
+function renderRegistros() {
+  var el = document.getElementById('registrosList');
+  el.innerHTML = '';
+  validaciones.forEach(function(v, i){
+    var card = document.createElement('div');
+    card.className = 'reg-card' + (v.anulado ? ' anulado' : '');
+    var h = document.createElement('div');
+    h.className = 'reg-head';
+    h.textContent = v.id + ' · ' + v.hora_local + ' · ' + (v.audio_segmento ? 'Audio seg. ' + v.audio_segmento + ', min ' + v.audio_minuto : 'sin audio marcado') + (v.anulado ? ' · ANULADO' : '');
+    card.appendChild(h);
+    if (v.declarante) { var d = document.createElement('div'); d.className = 'muted'; d.textContent = 'Manifestó: ' + v.declarante + (v.declarante_cargo ? ' (' + v.declarante_cargo + ')' : ''); card.appendChild(d); }
+    if (v.cita_textual) { var c = document.createElement('div'); c.className = 'reg-cita'; c.textContent = '“' + v.cita_textual + '”'; card.appendChild(c); }
+    if (v.nota_auditor) { var n = document.createElement('div'); n.className = 'muted'; n.textContent = 'Nota: ' + v.nota_auditor; card.appendChild(n); }
+    if (v.hipotesis.length === 0) { var e = document.createElement('div'); e.className = 'muted'; e.textContent = 'Información emergente (sin hipótesis)'; card.appendChild(e); }
+    v.hipotesis.forEach(function(x){
+      var chip = document.createElement('div');
+      chip.className = 'chip ef-' + x.efecto;
+      chip.textContent = EFECTOS[x.efecto].toUpperCase() + ' · ' + etiquetaHip(x);
+      card.appendChild(chip);
+    });
+    v.medios.forEach(function(m){ card.appendChild(filaMedio(m)); });
+    if (v.anulado) { var an = document.createElement('div'); an.className = 'muted'; an.textContent = 'Anulado a las ' + v.anulacion.hora_local + ' — motivo: ' + (v.anulacion.motivo || '(sin motivo)'); card.appendChild(an); }
+    else {
+      var acc = document.createElement('div');
+      acc.className = 'row2';
+      acc.style.marginTop = '8px';
+      var b1 = document.createElement('button'); b1.type = 'button'; b1.textContent = '＋ Foto / video'; b1.onclick = function(){ agregarMediaExtra(i); };
+      var b2 = document.createElement('button'); b2.type = 'button'; b2.textContent = 'Anular'; b2.style.color = '#c0392b';
+      b2.onclick = function(){
+        var motivo = prompt('Motivo de la anulación de ' + v.id + ' (queda registrado; el registro no se borra):');
+        if (motivo === null) return;
+        var ahora = new Date();
+        v.anulado = true;
+        v.anulacion = { motivo: motivo, hora_local: horaLocal(ahora), fecha_iso: ahora.toISOString() };
+        renderRegistros();
+        renderResumen();
+      };
+      acc.appendChild(b1); acc.appendChild(b2);
+      card.appendChild(acc);
+    }
+    el.appendChild(card);
+  });
+}
+function mediosPendientes() {
+  var p = [];
+  validaciones.forEach(function(v){ v.medios.forEach(function(m){ if (!m.guardado) p.push(m.archivo); }); });
+  return p;
+}
+function validacionesParaExportar() {
+  return validaciones.map(function(v){
+    var copia = JSON.parse(JSON.stringify(v, function(key, val){ return key === 'url' ? undefined : val; }));
+    return copia;
+  });
+}
+
+/* ---------- Refresco cuando cambia la lista en otra pestaña ---------- */
+function refrescarHipotesisUI() { if (regActual) { renderRegHipList(); } }
+window.addEventListener('storage', function(e){ if (e.key === getHipotesisKey() || e.key === AUDITORIA_KEY) { renderAuditoriaSelector(); refrescarHipotesisUI(); } });
+window.addEventListener('focus', function(){ renderAuditoriaSelector(); refrescarHipotesisUI(); });
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) { renderAuditoriaSelector(); refrescarHipotesisUI(); } });
 var roles = ['R','A','C','I'];
 var rolesNombres = {R:'Responsable', A:'Aprobador', C:'Consultado', I:'Informado'};
 var selectedRaci = {};
@@ -475,7 +953,8 @@ function prefijoArchivo() {
     .trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_ÁÉÍÓÚáéíóúÑñ]/g, '');
   var gestionLimpia = (document.getElementById('gestion').value || 'SinGestion')
     .replace(/^Gestión\s+/i, '').trim().replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_ÁÉÍÓÚáéíóúÑñ]/g, '');
-  return nombreLimpio + '_' + gestionLimpia;
+  var idE = (document.getElementById('entrevistaId').value || '').trim().replace(/\s+/g,'').replace(/[^A-Za-z0-9_\-]/g,'');
+  return (idE ? idE + '_' : '') + nombreLimpio + '_' + gestionLimpia;
 }
 
 function goStep(n) {
@@ -504,6 +983,9 @@ function goStep(n) {
   }
   if (n===3) {
     if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    // Si se vuelve a esta pantalla después de agregar información, el expediente debe prepararse de nuevo
+    document.getElementById('btnPrepararExport').style.display = 'block';
+    document.getElementById('exportLink').style.display = 'none';
     renderResumen();
   }
 }
@@ -525,6 +1007,7 @@ function renderResumen() {
     for (var k in selectedRaci) raciList.push(k);
     var html = '';
     html += '<div>Auditoría: <strong>' + (obtenerAuditoriaActual() || '(sin seleccionar)') + '</strong></div>';
+    html += '<div>ID de entrevista: <strong>' + esc(idEntrevista() || '(sin ID)') + '</strong></div>';
     html += '<div><strong>' + rutaActual() + '</strong></div>';
     html += '<div>Entrevistado: ' + (document.getElementById('entrevistado').value || '(sin nombre)') + '</div>';
     html += '<div>Cargo / Puesto: ' + (document.getElementById('cargo').value || '(sin registrar)') + ' / ' + (document.getElementById('puesto').value || '(sin registrar)') + '</div>';
@@ -543,9 +1026,17 @@ function renderResumen() {
     html += '<div>Justificación / Observaciones: ' + (justif ? justif : '(sin registrar todavía)') + '</div>';
     var notaLib = document.getElementById('notaLibre').value;
     html += '<div>Nota rápida (información emergente): ' + (notaLib ? notaLib : '(sin registrar todavía)') + '</div>';
-    if (efectoHipotesis && document.getElementById('hipotesisSelect').value && document.getElementById('hipotesisSelect').value !== '__nueva__') {
-      html += '<div>Hipótesis "' + document.getElementById('hipotesisSelect').value + '": ' + efectoHipotesis + '</div>';
-    }
+    var vigentes = validaciones.filter(function(v){ return !v.anulado; });
+    html += '<div>Registros de validación: <strong>' + vigentes.length + '</strong>' + (validaciones.length !== vigentes.length ? ' (+ ' + (validaciones.length - vigentes.length) + ' anulado/s)' : '') + '</div>';
+    validaciones.forEach(function(v){
+      html += '<div style="margin-left:10px;">' + esc(v.id) + ' · ' + esc(v.hora_local) + (v.audio_segmento ? ' · seg.' + v.audio_segmento + ' min ' + esc(v.audio_minuto) : '') + (v.anulado ? ' · ANULADO' : '') + ' — ' +
+        (v.hipotesis.length ? v.hipotesis.map(function(x){ return esc((x.codigo || x.titulo) + ' (' + EFECTOS[x.efecto] + ')'); }).join(', ') : 'emergente') +
+        ' · ' + v.medios.length + ' foto/video</div>';
+    });
+    html += '<div>Segmentos de audio marcados: ' + segmentosAudio.length + '</div>';
+    if (hipCreadasAqui.length) html += '<div>Hipótesis creadas en esta entrevista: ' + hipCreadasAqui.map(function(h){ return esc(h.codigo); }).join(', ') + '</div>';
+    var pend = mediosPendientes();
+    if (pend.length) html += '<div style="color:#c0392b;">Fotos/videos de registros SIN guardar todavía: ' + pend.length + '</div>';
     html += '<div>Evidencias adicionales: ' + evidenceCount + '</div>';
     var tresM = document.getElementById('tresMejoras').value;
     html += '<div>Tres mejoras propuestas: ' + (tresM ? tresM : '(sin registrar todavía)') + '</div>';
@@ -559,10 +1050,19 @@ function pauseRec() {
 }
 
 function prepararExportacion() {
+  var avisos = [];
+  if (!idEntrevista()) avisos.push('• La entrevista no tiene ID (SP-ENT-###).');
+  var pend = mediosPendientes();
+  if (pend.length) avisos.push('• ' + pend.length + ' foto(s)/video(s) de registros no se han guardado todavía:\n   ' + pend.join('\n   '));
+  if (consentimiento === 'Acepta' && segmentosAudio.length === 0) avisos.push('• Se autorizó el audio pero no se marcó ningún segmento: los registros no tendrán minuto de audio.');
+  if (regActual) avisos.push('• Hay un registro abierto sin guardar (' + idRegistro(regActual.num) + '): no se incluirá.');
+  if (avisos.length && !confirm('Antes de preparar el expediente:\n\n' + avisos.join('\n') + '\n\n¿Preparar igual?')) return;
   var raciList = [];
   for (var k in selectedRaci) raciList.push(k);
 
   var data = {
+    formato_expediente: 2,
+    entrevista_id: idEntrevista(),
     auditoria: obtenerAuditoriaActual(),
     ruta: rutaActual(),
     entrevistado: document.getElementById('entrevistado').value,
@@ -581,8 +1081,9 @@ function prepararExportacion() {
     voluntad_colaboracion: document.getElementById('voluntadColaboracion').value,
     indicadores_no_verbales: document.getElementById('indicadoresNoVerbales').value,
     justificacion_conducta: document.getElementById('justificacionConducta').value,
-    hipotesis_relacionada: (document.getElementById('hipotesisSelect').value === '__nueva__' ? '' : document.getElementById('hipotesisSelect').value),
-    efecto_sobre_hipotesis: efectoHipotesis,
+    segmentos_audio: segmentosAudio.map(function(x){ return { segmento: x.segmento, inicio_hora: x.inicio_hora, inicio_iso: x.inicio_iso }; }),
+    validaciones: validacionesParaExportar(),
+    hipotesis_creadas_en_entrevista: hipCreadasAqui,
     nota_libre: document.getElementById('notaLibre').value,
     evidencias_adicionales: evidenceCount,
     tres_mejoras: document.getElementById('tresMejoras').value,
