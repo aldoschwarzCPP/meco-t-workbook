@@ -172,10 +172,16 @@ function confirmarNuevaAuditoria() {
 }
 renderAuditoriaSelector();
 
+// Las hipótesis pueden ser texto (listas anteriores) u objetos {codigo, titulo, gestion, proceso, ...}
+function etiquetaHip(h) {
+  if (h && typeof h === 'object') return (h.codigo ? String(h.codigo).trim() + ' — ' : '') + String(h.titulo || '').trim();
+  return String(h == null ? '' : h);
+}
 function cargarHipotesis() {
   try {
     var raw = localStorage.getItem(getHipotesisKey());
-    return raw ? JSON.parse(raw) : [];
+    var lista = raw ? JSON.parse(raw) : [];
+    return Array.isArray(lista) ? lista.map(etiquetaHip) : [];
   } catch (e) { return []; }
 }
 
